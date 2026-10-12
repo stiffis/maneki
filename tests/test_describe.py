@@ -118,6 +118,8 @@ class RevealTest(unittest.TestCase):
         many_lines = {"command": "\n".join(["true"] * 7) + "\nrm -rf ~"}
         self.assertFalse(describe.reviewable("Bash", many_lines, 46, 6))
         self.assertTrue(describe.reviewable("Bash", {"command": "make check"}, 46, 6))
+        self.assertFalse(describe.reviewable("shell", {"patterns": []}, 46, 6))
+        self.assertFalse(describe.reviewable("Bash", {"command": "   "}, 46, 6))
 
     def test_always_scope_names_where_the_rule_is_saved(self):
         rule = {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "make check"}], "behavior": "allow", "destination": "userSettings"}

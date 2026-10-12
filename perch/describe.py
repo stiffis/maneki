@@ -203,7 +203,7 @@ def full_detail(tool, data):
 
 def reviewable(tool, data, width, lines):
     text = reveal(full_detail(tool, data))
-    if len(text) > REVIEW_LIMIT or text.endswith("…"):
+    if not text.strip() or len(text) > REVIEW_LIMIT or text.endswith("…"):
         return False
     rows = sum(max(1, math.ceil(len(line) / width)) for line in text.split("\n"))
     return rows <= lines
