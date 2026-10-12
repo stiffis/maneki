@@ -1,8 +1,9 @@
 # perch
 
-A small island at the top of the screen that keeps an eye on your Claude Code
-sessions: what each one is doing, when it finishes, and the permission requests
-you can answer without going back to the terminal.
+A small island at the top of the screen that keeps an eye on your coding agent
+sessions (Claude Code, Codex, GitHub Copilot CLI and OpenCode): what each one
+is doing, when it finishes, and the permission requests you can answer without
+going back to the terminal.
 
 Built for Hyprland, but any compositor with `wlr-layer-shell` works.
 
@@ -28,6 +29,25 @@ Claude Code ──hook (JSON on stdin)──▶ perch hook ──unix socket─�
   one took), and each subagent gets its own row with its steps, what it is
   doing and its time. Claude Code does not report real progress, so steps are
   the measure.
+
+## Agents
+
+Each session shows its agent's icon.
+
+| Agent       | How it connects                                        | Permissions from the island |
+| ----------- | ------------------------------------------------------ | --------------------------- |
+| Claude Code | hooks in `~/.claude/settings.json`                     | yes, races the terminal     |
+| Codex       | hooks in `~/.codex/hooks.json`                         | yes                         |
+| Copilot CLI | hooks in `~/.copilot/hooks/perch.json`                 | no, shown as needing you    |
+| OpenCode    | plugin in `~/.config/opencode/plugins/perch.js`        | yes, races its dialog       |
+
+- Codex asks you to review and trust new hooks once: open `/hooks` in Codex.
+- Copilot's `permissionRequest` fires before its own auto-approval rules, so
+  waiting on it would stall every tool call; its permission notification marks
+  the session instead. Its hooks end in `|| true` because a failing
+  `preToolUse` hook makes Copilot deny the tool.
+- OpenCode loads plugins when it starts, so restart running sessions after an
+  update.
 
 ## Requirements
 
@@ -75,6 +95,12 @@ perch setup --remove --apply
 ```
 
 `~/.config/perch` and `~/theme-switcher/perch` are left in place.
+
+## Icons
+
+The agent icons in `icons/` are rebuilt from the path data of
+[Lobe Icons](https://github.com/lobehub/lobe-icons) (MIT). The logos are
+trademarks of their owners.
 
 ## Development
 
