@@ -2,9 +2,11 @@ import json
 import os
 import socket
 
+from . import trust
+
 
 def runtime_dir():
-    base = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/perch-{os.getuid()}"
+    base = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
     return os.path.join(base, "perch")
 
 
@@ -16,12 +18,20 @@ def encode(message) -> bytes:
     return json.dumps(message, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
 
 
-def connect(timeout=0.5):
+def trusted(sock, genuine=None):
+    pid, uid = trust.peer(sock)
+    return pid is not None and uid == os.getuid() and (genuine or trust.genuine_daemon)(pid)
+
+
+def connect(timeout=0.5, genuine=None):
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.settimeout(timeout)
     try:
         sock.connect(socket_file())
     except OSError:
+        sock.close()
+        return None
+    if not trusted(sock, genuine):
         sock.close()
         return None
     return sock
@@ -42,7 +52,7 @@ def read_message(sock):
         return None
 
 
-def send(message, timeout=0.5) -> bool:
+def send(message, timeout=0.5):
     sock = connect(timeout)
     if sock is None:
         return False
