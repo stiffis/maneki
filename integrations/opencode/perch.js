@@ -27,127 +27,101 @@ const hook = (name, payload, wantsAnswer) =>
     child.stdin.end(JSON.stringify(payload))
   })
 
-const replies = { allow: "once", always: "always", deny: "reject" }
+const effects = { allow: "allow", always: "allow", deny: "deny" }
 
-export const PerchPlugin = async ({ client, directory }) => {
-  const parents = new Map()
-  const kinds = new Map()
-  const busy = new Set()
-  const launches = new Map()
+export default {
+  id: "perch",
+  setup: async (context) => {
+    const directory = context.location?.directory
+    const parents = new Map()
+    const busy = new Set()
+    const handles = []
 
-  const payload = (sessionID, extra = {}) => {
-    const parent = parents.get(sessionID)
-    return {
-      session_id: parent ?? sessionID,
-      cwd: directory,
-      ...(parent ? { agent_id: sessionID, agent_type: kinds.get(sessionID) } : {}),
-      ...extra,
+    const parentOf = async (sessionID) => {
+      if (!parents.has(sessionID)) {
+        let parent = null
+        try {
+          const session = await context.session.get({ sessionID })
+          parent = session?.parentID ?? session?.data?.parentID ?? null
+        } catch {}
+        parents.set(sessionID, parent)
+        if (parent) emit(sessionID, "SubagentStart")
+      }
+      return parents.get(sessionID)
     }
-  }
-  const emit = (sessionID, name, extra) => hook(name, payload(sessionID, extra), false)
 
-  const started = (info) => {
-    if (!info?.id) return
-    if (info.parentID) {
-      parents.set(info.id, info.parentID)
-      const queue = launches.get(info.parentID) ?? []
-      kinds.set(info.id, queue.shift()?.subagent_type || "general")
-      emit(info.id, "SubagentStart")
-    } else {
-      emit(info.id, "SessionStart", { source: "startup" })
+    const payload = (sessionID, extra = {}) => {
+      const parent = parents.get(sessionID)
+      return {
+        session_id: parent ?? sessionID,
+        cwd: directory,
+        ...(parent ? { agent_id: sessionID, agent_type: "subagent" } : {}),
+        ...extra,
+      }
     }
-  }
+    const emit = (sessionID, name, extra) => hook(name, payload(sessionID, extra), false)
 
-  const status = (sessionID, type) => {
-    if (type === "busy" && !busy.has(sessionID)) {
+    const working = async (sessionID) => {
+      if (!sessionID || busy.has(sessionID)) return
       busy.add(sessionID)
-      if (!parents.has(sessionID)) emit(sessionID, "UserPromptSubmit")
-    } else if (type === "idle" && busy.has(sessionID)) {
-      busy.delete(sessionID)
-      emit(sessionID, parents.has(sessionID) ? "SubagentStop" : "Stop")
-    }
-  }
-
-  const answer = async (request, choice) => {
-    const reply = replies[choice]
-    if (!reply) return
-    try {
-      if (client.permission?.reply) {
-        await client.permission.reply({ requestID: request.id, reply, directory })
-      } else if (client.postSessionIdPermissionsPermissionId) {
-        await client.postSessionIdPermissionsPermissionId({
-          path: { id: request.sessionID, permissionID: request.id },
-          body: { response: reply },
+      const parent = await parentOf(sessionID)
+      if (!parent) emit(sessionID, "UserPromptSubmit")
+      Promise.resolve(context.session.wait({ sessionID }))
+        .catch(() => {})
+        .finally(() => {
+          busy.delete(sessionID)
+          emit(sessionID, parent ? "SubagentStop" : "Stop")
         })
-      }
-    } catch {}
-  }
+    }
 
-  const asked = async (request) => {
-    const patterns = request.patterns ?? (request.pattern ? [].concat(request.pattern) : [])
-    const tool = request.permission ?? request.type ?? "permission"
-    const data = { ...(request.metadata ?? {}), patterns }
-    if (tool === "bash" && !data.command && patterns.length) data.command = patterns.join("\n")
-    const result = await hook(
-      "PermissionRequest",
-      payload(request.sessionID, {
-        tool_name: tool,
-        tool_input: data,
-        tool_use_id: request.id,
-        permission_suggestions: [{ type: "opencode", patterns: request.always?.length ? request.always : patterns }],
+    const register = async (make) => {
+      try {
+        handles.push(await make())
+      } catch {}
+    }
+
+    await register(() =>
+      context.session.hook("context", async (input) => {
+        working(input?.sessionID)
       }),
-      true,
     )
-    if (result?.answer) await answer(request, result.answer)
-  }
+    await register(() =>
+      context.tool.hook("execute.before", async (input) => {
+        await working(input.sessionID)
+        emit(input.sessionID, "PreToolUse", { tool_name: input.tool, tool_input: input.input ?? {}, tool_use_id: input.id })
+      }),
+    )
+    await register(() =>
+      context.tool.hook("execute.after", async (input) => {
+        const name = input.status === "error" ? "PostToolUseFailure" : "PostToolUse"
+        emit(input.sessionID, name, { tool_name: input.tool, tool_input: input.input ?? {}, tool_use_id: input.id })
+      }),
+    )
+    await register(() =>
+      context.permission.hook("evaluate", async (input) => {
+        if (input.effect !== "ask") return
+        await parentOf(input.sessionID)
+        const resources = input.resources ?? []
+        const data = { ...(input.metadata ?? {}), patterns: resources }
+        if ((input.action === "bash" || input.action === "shell") && !data.command && resources.length) data.command = resources.join("\n")
+        const result = await hook(
+          "PermissionRequest",
+          payload(input.sessionID, {
+            tool_name: input.action,
+            tool_input: data,
+            tool_use_id: input.source?.id,
+          }),
+          true,
+        )
+        const effect = effects[result?.answer]
+        if (effect) input.effect = effect
+      }),
+    )
 
-  return {
-    event: async ({ event: incoming }) => {
-      const props = incoming.properties ?? {}
-      switch (incoming.type) {
-        case "session.created":
-          started(props.info)
-          break
-        case "session.status":
-          status(props.sessionID, props.status?.type)
-          break
-        case "session.idle":
-          status(props.sessionID, "idle")
-          break
-        case "session.error":
-          if (props.sessionID && !parents.has(props.sessionID)) {
-            emit(props.sessionID, "StopFailure", { error: String(props.error?.data?.message ?? props.error?.name ?? "error") })
-          }
-          break
-        case "session.deleted":
-          if (props.info?.id && !parents.has(props.info.id)) emit(props.info.id, "SessionEnd")
-          break
-        case "question.asked":
-          if (props.sessionID) emit(props.sessionID, "PreToolUse", { tool_name: "AskUserQuestion", tool_input: {}, tool_use_id: props.id })
-          break
-        case "question.replied":
-        case "question.rejected":
-          if (props.sessionID) emit(props.sessionID, "PostToolUse", { tool_name: "AskUserQuestion", tool_input: {}, tool_use_id: props.requestID ?? props.id })
-          break
-        case "permission.asked":
-        case "permission.updated":
-          asked(props)
-          break
-        case "permission.replied":
-          emit(props.sessionID, "PermissionResolved", { tool_use_id: props.requestID ?? props.permissionID })
-          break
-      }
-    },
-    "tool.execute.before": async (input, output) => {
-      if (input.tool === "task") {
-        const queue = launches.get(input.sessionID) ?? []
-        queue.push(output.args ?? {})
-        launches.set(input.sessionID, queue)
-      }
-      emit(input.sessionID, "PreToolUse", { tool_name: input.tool, tool_input: output.args ?? {}, tool_use_id: input.callID })
-    },
-    "tool.execute.after": async (input) => {
-      emit(input.sessionID, "PostToolUse", { tool_name: input.tool, tool_input: input.args ?? {}, tool_use_id: input.callID })
-    },
-  }
+    return async () => {
+      handles.forEach((handle) => handle?.dispose?.())
+      await Promise.all([...busy].map((sessionID) => emit(sessionID, parents.get(sessionID) ? "SubagentStop" : "Stop")))
+      busy.clear()
+    }
+  },
 }

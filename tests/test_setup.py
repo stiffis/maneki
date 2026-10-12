@@ -160,6 +160,8 @@ class AgentSetupTest(unittest.TestCase):
         self.assertIn(f'const PERCH = "{setup.BIN}"', plugin)
         self.assertNotIn("__PERCH_BIN__", plugin)
         self.assertNotIn("node:net", plugin)
+        self.assertIn('id: "perch"', plugin)
+        self.assertIn("export default", plugin)
         self.assertEqual(setup.plan(self.home), [])
         setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
         for key in ("codex", "copilot", "opencode"):
