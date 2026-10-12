@@ -90,6 +90,27 @@ external screen when you work there.
 Click a session to see its recent steps. `perch status` prints the state as
 JSON and `perch quit` stops the island.
 
+## Mascot
+
+A pixel-art mascot sits at the left of the island and reacts to the most
+urgent session: it works while an agent works, startles when one asks for
+permission, celebrates when a turn finishes and sulks when one is interrupted.
+It moves for about three seconds after each change and then rests, blinking
+now and then. In do not disturb, the mascot still pops up alone for a moment
+to show that something finished or was interrupted.
+
+Pick it in `~/.config/perch/config.toml`; the island reloads the file when it
+changes:
+
+```toml
+mascot = "osaka"   # "cat" (the default), "osaka" or "none"
+mascot_scale = 1   # 1 to 4 screen pixels per sprite pixel
+```
+
+The cat is an orange tabby. Osaka is Ayumu Kasuga from Azumanga Daioh, drawn
+as fan art for personal use; she is not original art. The sprites live as text
+grids in `perch/mascots.py`.
+
 ## Theming
 
 The island loads `~/.config/perch/colors.css`, then the base `themes/style.css`
