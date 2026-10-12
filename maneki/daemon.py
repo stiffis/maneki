@@ -18,7 +18,7 @@ gi.require_version("Gtk4LayerShell", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
-from . import config, describe, hypr, mascots, transcript, trust  # noqa: E402
+from . import config, describe, hypr, markdown, mascots, transcript, trust  # noqa: E402
 from .hook import WAIT_LIMITS  # noqa: E402
 from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
@@ -54,8 +54,16 @@ def pid_alive(pid):
     return os.path.exists(f"/proc/{pid}")
 
 
-def label(text, *classes, wrap=False, width=None, lines=None):
+def label(text, *classes, wrap=False, width=None, lines=None, markup=False):
     widget = Gtk.Label(label=describe.reveal(text), xalign=0)
+    if markup:
+        formatted = markdown.to_markup(describe.reveal(text))
+        try:
+            Pango.parse_markup(formatted, -1, "\0")
+        except GLib.Error:
+            pass
+        else:
+            widget.set_markup(formatted)
     for name in classes:
         widget.add_css_class(name)
     if wrap:
@@ -683,7 +691,7 @@ class Island:
         row.append(label(names[session.id], "name"))
         text = session.activity
         if session.status == DONE and session.message:
-            text = describe.first_line(session.message, 120)
+            text = describe.first_line(markdown.to_plain(session.message), 120)
         activity = label(text, "activity", width=34)
         activity.set_hexpand(True)
         row.append(activity)
@@ -705,7 +713,8 @@ class Island:
         top.append(label(f"{agent.steps} {'step' if agent.steps == 1 else 'steps'}", "meta"))
         top.append(self.clock(lambda at, a=agent: describe.duration(a.elapsed(at)), now))
         box.append(top)
-        box.append(label(agent.activity, "agent-activity", width=44))
+        activity = agent.activity if agent.state == "running" else markdown.to_plain(agent.activity)
+        box.append(label(activity, "agent-activity", width=44))
         return box
 
     def session_details(self, session):
@@ -714,7 +723,7 @@ class Island:
         for step in list(session.steps)[-MAX_STEPS:]:
             box.append(label(f"{STEP_SYMBOL[step.state]} {step.label}", "step", step.state, width=48))
         if session.message:
-            box.append(label(session.message, "message", wrap=True, width=48, lines=4))
+            box.append(label(session.message, "message", wrap=True, width=48, lines=4, markup=True))
         if not session.steps and not session.message:
             box.append(label("No steps yet", "step"))
         return box
