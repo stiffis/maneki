@@ -152,7 +152,9 @@ class AgentSetupTest(unittest.TestCase):
         copilot = json.loads(self.t["copilot"].read_text())
         command = copilot["hooks"]["notification"][0]["bash"]
         self.assertTrue(command.endswith("--agent copilot --event Notification || true"))
-        self.assertNotIn("PermissionRequest", copilot["hooks"])
+        permission = copilot["hooks"]["PermissionRequest"][0]
+        self.assertEqual(permission["timeoutSec"], 90)
+        self.assertTrue(permission["bash"].endswith("--event PermissionRequest || true"))
         self.assertEqual(self.t["opencode"].read_text(), (setup.INTEGRATIONS / "opencode" / "perch.js").read_text())
         self.assertEqual(setup.plan(self.home), [])
         setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")

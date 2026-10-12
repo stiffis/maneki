@@ -47,7 +47,9 @@ COPILOT_EVENTS = (
     ("SubagentStop", "SubagentStop"),
     ("notification", "Notification"),
     ("errorOccurred", "StopFailure"),
+    ("PermissionRequest", "PermissionRequest"),
 )
+COPILOT_TIMEOUTS = {"PermissionRequest": 90}
 THEME_FILES = (
     "colors-everforest.css",
     "colors-everforest-light.css",
@@ -108,7 +110,7 @@ def copilot_hooks(bin_path=BIN):
             {
                 "type": "command",
                 "bash": f"{hook_command(bin_path, 'copilot')} --event {event} || true",
-                "timeoutSec": 10,
+                "timeoutSec": COPILOT_TIMEOUTS.get(event, 10),
             }
         ]
         for key, event in COPILOT_EVENTS
