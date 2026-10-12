@@ -73,13 +73,15 @@ class GenuineDaemonTest(unittest.TestCase):
         return root, os.path.realpath(script)
 
     def test_the_real_daemon_is_recognized(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root, script = self.make(tmp, lambda s: [sys.executable, "-I", s, "daemon"])
-            self.assertTrue(trust.genuine_daemon(40, root, script))
+        for flags in ("-I", "-IS"):
+            with tempfile.TemporaryDirectory() as tmp:
+                root, script = self.make(tmp, lambda s, f=flags: [sys.executable, f, s, "daemon"])
+                self.assertTrue(trust.genuine_daemon(40, root, script), flags)
 
     def test_other_programs_are_rejected(self):
         cases = [
             lambda s: [sys.executable, s, "daemon"],
+            lambda s: [sys.executable, "-S", s, "daemon"],
             lambda s: [sys.executable, "-I", s, "demo"],
             lambda s: [sys.executable, "-I", "/tmp/evil.py", "daemon"],
             lambda s: ["/usr/bin/nc", "-lU", "perch.sock"],

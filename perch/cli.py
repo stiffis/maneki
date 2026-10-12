@@ -54,6 +54,9 @@ def main(argv):
         return hook(argv[1:])
     args = parser().parse_args(argv)
     if args.command == "daemon":
+        import site
+
+        site.main()
         from .daemon import main as daemon
 
         return daemon()

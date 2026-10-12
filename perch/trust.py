@@ -7,6 +7,7 @@ AGENTS = frozenset({"claude", "codex", "copilot", "opencode"})
 DESKTOPS = frozenset({"Hyprland"})
 PEER = struct.Struct("3i")
 DEPTH = 64
+ISOLATED = frozenset({"-I", "-IS"})
 DAEMON_SCRIPT = os.path.realpath(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "perch"))
 
 
@@ -62,7 +63,7 @@ def genuine_daemon(pid, proc="/proc", script=DAEMON_SCRIPT, python=None):
     if info is None:
         return False
     _, _, args = info
-    if len(args) != 4 or args[1] != "-I" or args[3] != "daemon":
+    if len(args) != 4 or args[1] not in ISOLATED or args[3] != "daemon":
         return False
     try:
         cwd = os.readlink(os.path.join(proc, str(pid), "cwd"))
