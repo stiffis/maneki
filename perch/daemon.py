@@ -16,6 +16,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
 from . import describe, transcript  # noqa: E402
+from .hook import WAIT_LIMITS  # noqa: E402
 from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
 from .server import AlreadyRunning, Server  # noqa: E402
@@ -305,15 +306,28 @@ class Island:
         choices = [("allow", "Allow"), ("deny", "Deny")]
         if ask.suggestion:
             choices.append(("always", "Always"))
+        if agent in WAIT_LIMITS:
+            choices.append(("terminal", "Terminal"))
         for answer, text in choices:
             button = Gtk.Button(label=text)
             button.add_css_class(answer)
-            button.connect("clicked", lambda _button, a=answer, i=ask.id: self.answer(i, a))
+            reply = None if answer == "terminal" else answer
+            button.connect("clicked", lambda _button, a=reply, i=ask.id: self.answer(i, a))
             if answer == "always":
                 button.set_tooltip_text(describe.always_label(ask.suggestion))
             buttons.append(button)
         card.append(buttons)
-        if first:
+        if agent in WAIT_LIMITS:
+            name = describe.AGENT_NAMES.get(agent, agent)
+            deadline = ask.ts + WAIT_LIMITS[agent]
+            card.append(
+                self.clock(
+                    lambda at, d=deadline, n=name: f"{n} asks in the terminal in {describe.duration(max(0, d - at))}",
+                    time.time(),
+                    "hint",
+                )
+            )
+        elif first:
             card.append(label(HINT, "hint"))
         return card
 
