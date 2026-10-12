@@ -183,3 +183,12 @@ tooltip {
 .agent-icon {
     color: var(--text);
 }
+
+.warning {
+    color: var(--danger);
+    font-size: 12px;
+}
+
+.ask button:disabled {
+    opacity: 0.4;
+}

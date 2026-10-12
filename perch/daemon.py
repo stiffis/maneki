@@ -15,13 +15,17 @@ gi.require_version("Gtk4LayerShell", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
-from . import describe, transcript  # noqa: E402
+from . import describe, transcript, trust  # noqa: E402
 from .hook import WAIT_LIMITS  # noqa: E402
 from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
 from .server import AlreadyRunning, Server  # noqa: E402
 
 ANSWERS = ("allow", "deny", "always", "terminal")
+GRANTS = ("allow", "always")
+GUARDED = ANSWERS + ("quit",)
+ARM_SECONDS = 0.8
+DETAIL_LINES = 6
 STATUS_SYMBOL = {"working": "●", "asking": "●", "attention": "●", "done": "✓", "idle": "○"}
 STEP_SYMBOL = {"running": "…", "ok": "✓", "error": "✗"}
 AGENT_SYMBOL = {"running": "↳", "ok": "✓", "error": "✗"}
@@ -39,7 +43,7 @@ def pid_alive(pid):
 
 
 def label(text, *classes, wrap=False, width=None, lines=None):
-    widget = Gtk.Label(label=text, xalign=0)
+    widget = Gtk.Label(label=describe.reveal(text), xalign=0)
     for name in classes:
         widget.add_css_class(name)
     if wrap:
@@ -64,6 +68,8 @@ class Island:
         self.opened = set()
         self.clocks = []
         self.icons = {}
+        self.shown_at = {}
+        self.arming = set()
         self.render_queued = False
         self.reload_queued = False
         self.window = None
@@ -148,7 +154,7 @@ class Island:
             self.track(event)
             self.queue_render()
         elif kind == "cmd":
-            connection.reply(self.command(message.get("cmd")))
+            connection.reply(self.command(message.get("cmd"), connection.pid))
         else:
             connection.close()
 
@@ -159,11 +165,17 @@ class Island:
             self.board.remove_ask(ask_id)
             self.queue_render()
 
-    def command(self, name):
+    def command(self, name, pid=None):
+        if name in GUARDED and not (pid and trust.caller_is_user(pid)):
+            return {"ok": False, "error": "only you can do that: use the island or its keybinds, not an agent or a script"}
         if name in ANSWERS:
             ask = self.board.oldest_ask()
             if ask is None:
                 return {"ok": False, "error": "nothing is waiting for an answer"}
+            if name in GRANTS and not self.armed(ask.id):
+                return {"ok": False, "error": "the request just appeared; look at it first"}
+            if name in GRANTS and not self.reviewable(ask):
+                return {"ok": False, "error": "this request is too long to review on the island; answer it in the terminal"}
             self.answer(ask.id, None if name == "terminal" else name)
             return {"ok": True, "tool": ask.tool}
         if name == "toggle":
@@ -177,7 +189,27 @@ class Island:
             return {"ok": True}
         return {"ok": False, "error": f"unknown command: {name}"}
 
+    def armed(self, ask_id):
+        shown = self.shown_at.get(ask_id)
+        return shown is not None and time.monotonic() - shown >= ARM_SECONDS
+
+    def reviewable(self, ask):
+        return describe.reviewable(ask.tool, ask.data, DETAIL_CHARS, DETAIL_LINES)
+
+    def arm_later(self, ask_id):
+        if ask_id in self.arming or self.armed(ask_id):
+            return
+        self.arming.add(ask_id)
+
+        def rearm():
+            self.arming.discard(ask_id)
+            self.queue_render()
+            return GLib.SOURCE_REMOVE
+
+        GLib.timeout_add(int(ARM_SECONDS * 1000) + 50, rearm)
+
     def answer(self, ask_id, answer):
+        self.shown_at.pop(ask_id, None)
         self.board.remove_ask(ask_id)
         connection = self.connections.pop(ask_id, None)
         if connection:
@@ -219,6 +251,7 @@ class Island:
         return GLib.SOURCE_CONTINUE
 
     def icon(self, agent):
+        agent = agent if agent in describe.AGENT_NAMES else "unknown"
         if agent not in self.icons:
             path = ICONS / f"{agent}-symbolic.svg"
             self.icons[agent] = (
@@ -299,9 +332,16 @@ class Island:
         heading.append(self.icon(agent))
         heading.append(label(f"{who} {describe.ask_title(ask.tool)}", "ask-title", width=60))
         card.append(heading)
-        detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=60, lines=6)
+        detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=60, lines=DETAIL_LINES)
         detail.set_width_chars(DETAIL_CHARS)
         card.append(detail)
+        self.shown_at.setdefault(ask.id, time.monotonic())
+        armed = self.armed(ask.id)
+        if not armed:
+            self.arm_later(ask.id)
+        reviewable = self.reviewable(ask)
+        if not reviewable:
+            card.append(label("Too long to review here. Answer it in the terminal.", "warning", wrap=True, width=60))
         buttons = Gtk.Box(spacing=6, homogeneous=True)
         choices = [("allow", "Allow"), ("deny", "Deny")]
         if ask.suggestion:
@@ -311,12 +351,16 @@ class Island:
         for answer, text in choices:
             button = Gtk.Button(label=text)
             button.add_css_class(answer)
+            if answer in GRANTS:
+                button.set_sensitive(armed and reviewable)
             reply = None if answer == "terminal" else answer
             button.connect("clicked", lambda _button, a=reply, i=ask.id: self.answer(i, a))
             if answer == "always":
                 button.set_tooltip_text(describe.always_label(ask.suggestion))
             buttons.append(button)
         card.append(buttons)
+        if ask.suggestion and reviewable:
+            card.append(label(describe.always_scope(ask.suggestion), "hint", wrap=True, width=60))
         if agent in WAIT_LIMITS:
             name = describe.AGENT_NAMES.get(agent, agent)
             deadline = ask.ts + WAIT_LIMITS[agent]
