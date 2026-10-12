@@ -49,7 +49,7 @@ def main(argv):
     if argv[:1] == ["hook"]:
         from .hook import main as hook
 
-        return hook()
+        return hook(argv[1:])
     args = parser().parse_args(argv)
     if args.command == "daemon":
         from .daemon import main as daemon
