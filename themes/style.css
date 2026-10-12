@@ -130,6 +130,14 @@ window.perch {
     margin: 4px 0 2px 0;
 }
 
+.ask.target {
+    border-left: 3px solid var(--asking);
+}
+
+.ask.target .keys {
+    color: var(--text);
+}
+
 .ask-title {
     font-weight: bold;
 }

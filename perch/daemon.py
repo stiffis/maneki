@@ -361,6 +361,9 @@ class Island:
         card.append(buttons)
         if ask.suggestion and reviewable:
             card.append(label(describe.always_scope(ask.suggestion), "hint", wrap=True, width=60))
+        if first:
+            card.add_css_class("target")
+            card.append(label(HINT, "hint", "keys"))
         if agent in WAIT_LIMITS:
             name = describe.AGENT_NAMES.get(agent, agent)
             deadline = ask.ts + WAIT_LIMITS[agent]
@@ -371,8 +374,6 @@ class Island:
                     "hint",
                 )
             )
-        elif first:
-            card.append(label(HINT, "hint"))
         return card
 
     def session_row(self, session, names, now):
