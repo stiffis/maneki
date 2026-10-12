@@ -23,7 +23,9 @@ from .server import AlreadyRunning, Server  # noqa: E402
 ANSWERS = ("allow", "deny", "always")
 STATUS_SYMBOL = {"working": "●", "asking": "●", "attention": "●", "done": "✓", "idle": "○"}
 STEP_SYMBOL = {"running": "…", "ok": "✓", "error": "✗"}
+AGENT_SYMBOL = {"running": "↳", "ok": "✓", "error": "✗"}
 MAX_ASKS = 2
+MAX_AGENTS = 4
 MAX_STEPS = 6
 DETAIL_CHARS = 46
 TOP_MARGIN = 6
@@ -58,6 +60,7 @@ class Island:
         self.offsets = {}
         self.expanded = False
         self.opened = set()
+        self.clocks = []
         self.render_queued = False
         self.reload_queued = False
         self.window = None
@@ -95,10 +98,14 @@ class Island:
             self.server.stop()
 
     def css_text(self):
-        parts = []
-        for name, fallback in (("colors.css", "colors-everforest.css"), ("style.css", "style.css")):
-            path = config_dir() / name
-            parts.append((path if path.is_file() else THEMES / fallback).read_text())
+        colors = config_dir() / "colors.css"
+        overrides = config_dir() / "style.css"
+        parts = [
+            (colors if colors.is_file() else THEMES / "colors-everforest.css").read_text(),
+            (THEMES / "style.css").read_text(),
+        ]
+        if overrides.is_file():
+            parts.append(overrides.read_text())
         return "\n".join(parts)
 
     def load_css(self):
@@ -205,7 +212,19 @@ class Island:
         self.resolve(resolved)
         if self.follow_transcripts(now) or changed:
             self.queue_render()
+        self.update_clocks(now)
         return GLib.SOURCE_CONTINUE
+
+    def update_clocks(self, now):
+        for widget, text_at in self.clocks:
+            text = text_at(now)
+            if widget.get_label() != text:
+                widget.set_label(text)
+
+    def clock(self, text_at, now, *classes):
+        widget = label(text_at(now), "elapsed", *classes)
+        self.clocks.append((widget, text_at))
+        return widget
 
     def queue_render(self):
         if not self.render_queued and self.window is not None:
@@ -218,6 +237,8 @@ class Island:
 
     def render(self):
         self.render_queued = False
+        self.clocks = []
+        now = time.time()
         sessions = self.board.visible(self.expanded)
         asks = self.board.ordered_asks()
         if not sessions and not asks:
@@ -234,7 +255,12 @@ class Island:
         if len(asks) > MAX_ASKS:
             island.append(label(f"+{len(asks) - MAX_ASKS} more waiting", "hint"))
         for session in sessions:
-            island.append(self.session_row(session, names))
+            island.append(self.session_row(session, names, now))
+            agents = list(session.agents.values())
+            for agent in agents[-MAX_AGENTS:]:
+                island.append(self.agent_row(agent, now))
+            if len(agents) > MAX_AGENTS:
+                island.append(label(f"+{len(agents) - MAX_AGENTS} more agents", "hint", "agent-more"))
             if self.expanded or session.id in self.opened:
                 island.append(self.session_details(session))
         self.window.set_child(island)
@@ -245,7 +271,10 @@ class Island:
     def ask_card(self, ask, names, first):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card.add_css_class("ask")
-        title = f"{names.get(ask.session_id, 'Claude')} {describe.ask_title(ask.tool)}"
+        who = names.get(ask.session_id, "Claude")
+        if ask.agent:
+            who = f"{who} › {ask.agent}"
+        title = f"{who} {describe.ask_title(ask.tool)}"
         card.append(label(title, "ask-title", width=60))
         detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=60, lines=6)
         detail.set_width_chars(DETAIL_CHARS)
@@ -266,7 +295,7 @@ class Island:
             card.append(label(HINT, "hint"))
         return card
 
-    def session_row(self, session, names):
+    def session_row(self, session, names, now):
         row = Gtk.Box(spacing=8)
         row.add_css_class("session")
         row.append(label(STATUS_SYMBOL.get(session.status, "●"), "dot", session.status))
@@ -277,10 +306,26 @@ class Island:
         activity = label(text, "activity", width=42)
         activity.set_hexpand(True)
         row.append(activity)
+        row.append(self.clock(lambda at, s=session: describe.duration(s.elapsed(at)), now))
         click = Gtk.GestureClick()
         click.connect("released", lambda *_args: self.toggle_session(session.id))
         row.add_controller(click)
         return row
+
+    def agent_row(self, agent, now):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        box.add_css_class("agent")
+        box.add_css_class(agent.state)
+        top = Gtk.Box(spacing=8)
+        top.append(label(AGENT_SYMBOL.get(agent.state, "↳"), "branch"))
+        name = label(agent.label, "agent-name", width=40)
+        name.set_hexpand(True)
+        top.append(name)
+        top.append(label(f"{agent.steps} {'step' if agent.steps == 1 else 'steps'}", "meta"))
+        top.append(self.clock(lambda at, a=agent: describe.duration(a.elapsed(at)), now))
+        box.append(top)
+        box.append(label(agent.activity, "agent-activity", width=52))
+        return box
 
     def session_details(self, session):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)

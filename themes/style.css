@@ -8,7 +8,7 @@ window.perch {
     border: 2px solid var(--border);
     border-radius: 0;
     padding: 6px 12px;
-    min-width: 280px;
+    min-width: 440px;
     font-size: 13px;
 }
 
@@ -58,6 +58,46 @@ window.perch {
 
 .activity {
     color: var(--muted);
+}
+
+.elapsed {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.agent {
+    margin-left: 19px;
+}
+
+.agent .branch {
+    color: var(--working);
+}
+
+.agent.ok .branch {
+    color: var(--done);
+}
+
+.agent.error .branch {
+    color: var(--danger);
+}
+
+.agent-name {
+    color: var(--text);
+}
+
+.agent-activity {
+    color: var(--muted);
+    font-size: 12px;
+    margin-left: 19px;
+}
+
+.meta {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.agent-more {
+    margin-left: 19px;
 }
 
 .details {
