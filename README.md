@@ -37,15 +37,18 @@ Each session shows its agent's icon.
 | Agent       | How it connects                                        | Permissions from the island |
 | ----------- | ------------------------------------------------------ | --------------------------- |
 | Claude Code | hooks in `~/.claude/settings.json`                     | yes, races the terminal     |
-| Codex       | hooks in `~/.codex/hooks.json`                         | yes                         |
-| Copilot CLI | hooks in `~/.copilot/hooks/perch.json`                 | no, shown as needing you    |
+| Codex       | hooks in `~/.codex/hooks.json`                         | yes, for 60 seconds         |
+| Copilot CLI | hooks in `~/.copilot/hooks/perch.json`                 | yes, for 60 seconds         |
 | OpenCode    | plugin in `~/.config/opencode/plugins/perch.js`        | yes, races its dialog       |
 
 - Codex asks you to review and trust new hooks once: open `/hooks` in Codex.
-- Copilot's `permissionRequest` fires before its own auto-approval rules, so
-  waiting on it would stall every tool call; its permission notification marks
-  the session instead. Its hooks end in `|| true` because a failing
-  `preToolUse` hook makes Copilot deny the tool.
+- Codex and Copilot wait for the hook before showing their own prompt, so the
+  island gives up after 60 seconds (or at once with **Terminal** or
+  `perch terminal`) and hands the request back to them.
+- Copilot asks the hook before checking its own saved approvals, so the island
+  also shows requests Copilot would have approved by itself.
+- Copilot's hooks end in `|| true` because a failing `preToolUse` hook makes
+  Copilot deny the tool.
 - OpenCode loads plugins when it starts, so restart running sessions after an
   update.
 
@@ -74,6 +77,7 @@ against the file's hash, and skipped when it is already there.
 | `Super+Alt+N`   | `perch deny`   | deny it                                        |
 | `Super+Alt+A`   | `perch always` | allow it and keep the rule Claude suggested    |
 | `Super+Alt+I`   | `perch toggle` | show idle sessions and recent steps            |
+|                 | `perch terminal` | leave the request to the agent's own prompt  |
 
 Click a session to see its recent steps. `perch status` prints the state as
 JSON and `perch quit` stops the island.
