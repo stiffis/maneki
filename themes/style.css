@@ -181,6 +181,11 @@ window.perch {
     font-size: 11px;
 }
 
+.notice {
+    color: var(--text);
+    padding: 2px 0;
+}
+
 tooltip {
     background-color: var(--bg);
     color: var(--text);

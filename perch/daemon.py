@@ -15,7 +15,7 @@ gi.require_version("Gtk4LayerShell", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
-from . import describe, transcript, trust  # noqa: E402
+from . import describe, hypr, transcript, trust  # noqa: E402
 from .hook import WAIT_LIMITS  # noqa: E402
 from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
@@ -23,7 +23,9 @@ from .server import AlreadyRunning, Server  # noqa: E402
 
 ANSWERS = ("allow", "deny", "always", "terminal")
 GRANTS = ("allow", "always")
-GUARDED = ANSWERS + ("quit",)
+GUARDED = ANSWERS + ("quit", "dnd")
+NOTICE_SECONDS = 1.5
+DESKTOP_DELAY_MS = 120
 ARM_SECONDS = 0.8
 DETAIL_LINES = 6
 STATUS_SYMBOL = {"working": "●", "asking": "●", "attention": "●", "done": "✓", "idle": "○"}
@@ -72,6 +74,13 @@ class Island:
         self.arming = set()
         self.render_queued = False
         self.reload_queued = False
+        self.dnd = False
+        self.fullscreen = False
+        self.monitor_name = None
+        self.layer = None
+        self.notice = None
+        self.desktop_queued = False
+        self.events = None
         self.window = None
         self.monitor = None
         self.server = None
@@ -98,6 +107,11 @@ class Island:
         self.load_css()
         self.watch_css()
         GLib.timeout_add(1000, self.tick)
+        self.refresh_desktop()
+        try:
+            self.events = hypr.Events(self.desktop_event)
+        except OSError as error:
+            print(f"perch: not following Hyprland: {error}", file=sys.stderr)
         self.render()
 
     def shutdown(self, app):
@@ -182,12 +196,55 @@ class Island:
             self.expanded = not self.expanded
             self.queue_render()
             return {"ok": True, "expanded": self.expanded}
+        if name == "dnd":
+            self.dnd = not self.dnd
+            self.show_notice("Do not disturb: on" if self.dnd else "Do not disturb: off")
+            return {"ok": True, "dnd": self.dnd}
         if name == "status":
-            return {"ok": True, **self.board.snapshot()}
+            desktop = {"dnd": self.dnd, "fullscreen": self.fullscreen, "monitor": self.monitor_name}
+            return {"ok": True, **desktop, **self.board.snapshot()}
         if name == "quit":
             GLib.idle_add(self.app.quit)
             return {"ok": True}
         return {"ok": False, "error": f"unknown command: {name}"}
+
+    def show_notice(self, text):
+        self.notice = (text, time.monotonic() + NOTICE_SECONDS)
+        self.queue_render()
+        GLib.timeout_add(int(NOTICE_SECONDS * 1000) + 50, lambda: self.queue_render() or GLib.SOURCE_REMOVE)
+
+    def desktop_event(self, name, data):
+        if name in hypr.WATCHED and not self.desktop_queued:
+            self.desktop_queued = True
+            GLib.timeout_add(DESKTOP_DELAY_MS, self.refresh_desktop)
+
+    def refresh_desktop(self):
+        self.desktop_queued = False
+        monitor = hypr.focused(hypr.query("monitors"))
+        if monitor is None:
+            return GLib.SOURCE_REMOVE
+        if monitor.get("name") != self.monitor_name:
+            self.place_on(monitor.get("name"))
+        quiet = hypr.fullscreen(monitor, hypr.query("clients"))
+        if quiet != self.fullscreen:
+            self.fullscreen = quiet
+            self.queue_render()
+        return GLib.SOURCE_REMOVE
+
+    def place_on(self, name):
+        monitors = Gdk.Display.get_default().get_monitors()
+        for index in range(monitors.get_n_items()):
+            monitor = monitors.get_item(index)
+            if monitor.get_connector() == name:
+                LayerShell.set_monitor(self.window, monitor)
+                self.monitor_name = name
+                return
+
+    def set_layer(self, overlay):
+        layer = LayerShell.Layer.OVERLAY if overlay else LayerShell.Layer.TOP
+        if layer != self.layer:
+            LayerShell.set_layer(self.window, layer)
+            self.layer = layer
 
     def armed(self, ask_id):
         shown = self.shown_at.get(ask_id)
@@ -291,12 +348,15 @@ class Island:
         self.render_queued = False
         self.clocks = []
         now = time.time()
-        sessions = self.board.visible(self.expanded)
+        quiet = self.dnd or self.fullscreen
+        sessions = [] if quiet else self.board.visible(self.expanded)
         asks = self.board.ordered_asks()
-        if not sessions and not asks:
+        notice = self.notice[0] if self.notice and time.monotonic() < self.notice[1] else None
+        if not sessions and not asks and not notice:
             self.window.set_visible(False)
             self.window.set_child(None)
             return GLib.SOURCE_REMOVE
+        self.set_layer(bool(asks))
         names = self.board.names()
         island = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         island.add_css_class("island")
@@ -306,6 +366,8 @@ class Island:
             island.append(self.ask_card(ask, names, index == 0))
         if len(asks) > MAX_ASKS:
             island.append(label(f"+{len(asks) - MAX_ASKS} more waiting", "hint"))
+        if notice:
+            island.append(label(notice, "notice"))
         for session in sessions:
             island.append(self.session_row(session, names, now))
             agents = list(session.agents.values())
