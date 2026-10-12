@@ -21,6 +21,7 @@ STEP_LIMIT = 12
 RECENT_LIMIT = 24
 STALE_SECONDS = 12 * 3600
 IDLE_WITHOUT_PID_SECONDS = 30 * 60
+SILENT_WITHOUT_PID_SECONDS = 15 * 60
 
 
 @dataclass
@@ -338,6 +339,11 @@ class Board:
                 resolved += self.drop(session.id)
                 changed = True
                 continue
+            if session.pid is None and session.status in BUSY and not self.asks_of(session.id):
+                if now - session.seen > SILENT_WITHOUT_PID_SECONDS:
+                    self.set_status(session, IDLE, now, "No news for a while")
+                    session.turn_end = session.seen
+                    changed = True
             if session.status == DONE and now - session.status_ts >= self.done_seconds:
                 session.status = IDLE
                 changed = True

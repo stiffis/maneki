@@ -243,5 +243,21 @@ class NoPidTest(unittest.TestCase):
         self.assertIn("s1", board.sessions)
 
 
+class SilentSessionTest(unittest.TestCase):
+    def test_busy_sessions_without_a_pid_settle_after_fifteen_quiet_minutes(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="opencode"))
+        board.expire(1 + 15 * 60 - 1, lambda pid: True)
+        self.assertEqual(board.sessions["s1"].status, WORKING)
+        board.expire(1 + 15 * 60 + 1, lambda pid: True)
+        self.assertEqual((board.sessions["s1"].status, board.sessions["s1"].activity), (IDLE, "No news for a while"))
+
+    def test_sessions_with_a_pid_keep_working(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, pid=9))
+        board.expire(1 + 60 * 60, lambda pid: True)
+        self.assertEqual(board.sessions["s1"].status, WORKING)
+
+
 if __name__ == "__main__":
     unittest.main()
