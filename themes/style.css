@@ -179,3 +179,7 @@ tooltip {
     border: 1px solid var(--border);
     border-radius: 0;
 }
+
+.agent-icon {
+    color: var(--text);
+}

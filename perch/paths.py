@@ -6,6 +6,7 @@ from . import proto
 ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / "bin" / "perch"
 THEMES = ROOT / "themes"
+ICONS = ROOT / "icons"
 INTEGRATIONS = ROOT / "integrations"
 
 

@@ -17,7 +17,7 @@ from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
 from . import describe, transcript  # noqa: E402
 from .board import DONE, Board  # noqa: E402
-from .paths import THEMES, config_dir, socket_path  # noqa: E402
+from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
 from .server import AlreadyRunning, Server  # noqa: E402
 
 ANSWERS = ("allow", "deny", "always")
@@ -29,6 +29,7 @@ MAX_AGENTS = 4
 MAX_STEPS = 6
 DETAIL_CHARS = 46
 TOP_MARGIN = 6
+ICON_SIZE = 14
 HINT = "Super+Alt+Y allow · Super+Alt+N deny"
 
 
@@ -61,6 +62,7 @@ class Island:
         self.expanded = False
         self.opened = set()
         self.clocks = []
+        self.icons = {}
         self.render_queued = False
         self.reload_queued = False
         self.window = None
@@ -215,6 +217,22 @@ class Island:
         self.update_clocks(now)
         return GLib.SOURCE_CONTINUE
 
+    def icon(self, agent):
+        if agent not in self.icons:
+            path = ICONS / f"{agent}-symbolic.svg"
+            self.icons[agent] = (
+                Gtk.IconPaintable.new_for_file(Gio.File.new_for_path(str(path)), ICON_SIZE, 1)
+                if path.is_file()
+                else None
+            )
+        paintable = self.icons[agent]
+        image = Gtk.Image.new_from_paintable(paintable) if paintable else Gtk.Image()
+        image.set_pixel_size(ICON_SIZE)
+        image.add_css_class("agent-icon")
+        image.add_css_class(agent)
+        image.set_tooltip_text(describe.AGENT_NAMES.get(agent, agent))
+        return image
+
     def update_clocks(self, now):
         for widget, text_at in self.clocks:
             text = text_at(now)
@@ -271,11 +289,15 @@ class Island:
     def ask_card(self, ask, names, first):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         card.add_css_class("ask")
-        who = names.get(ask.session_id, "Claude")
+        session = self.board.sessions.get(ask.session_id)
+        agent = session.agent if session else "claude"
+        who = names.get(ask.session_id, describe.AGENT_NAMES.get(agent, agent))
         if ask.agent:
             who = f"{who} › {ask.agent}"
-        title = f"{who} {describe.ask_title(ask.tool)}"
-        card.append(label(title, "ask-title", width=60))
+        heading = Gtk.Box(spacing=8)
+        heading.append(self.icon(agent))
+        heading.append(label(f"{who} {describe.ask_title(ask.tool)}", "ask-title", width=60))
+        card.append(heading)
         detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=60, lines=6)
         detail.set_width_chars(DETAIL_CHARS)
         card.append(detail)
@@ -299,6 +321,7 @@ class Island:
         row = Gtk.Box(spacing=8)
         row.add_css_class("session")
         row.append(label(STATUS_SYMBOL.get(session.status, "●"), "dot", session.status))
+        row.append(self.icon(session.agent))
         row.append(label(names[session.id], "name"))
         text = session.activity
         if session.status == DONE and session.message:

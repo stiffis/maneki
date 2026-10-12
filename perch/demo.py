@@ -11,9 +11,10 @@ CHIP = "/home/demo/xqdot4z"
 
 
 class Fake:
-    def __init__(self, cwd):
+    def __init__(self, cwd, agent="claude"):
         self.session = f"demo-{uuid.uuid4().hex[:8]}"
         self.cwd = cwd
+        self.agent = agent
 
     def event(self, name, **fields):
         return {
@@ -21,7 +22,8 @@ class Fake:
             "session_id": self.session,
             "cwd": self.cwd,
             "ts": time.time(),
-            "claude_pid": os.getpid(),
+            "pid": os.getpid(),
+            "agent": self.agent,
             **fields,
         }
 
@@ -48,7 +50,7 @@ class Fake:
 
 
 def writer():
-    book = Fake(BOOK)
+    book = Fake(BOOK, "codex")
     book.emit("SessionStart", source="startup")
     book.emit("UserPromptSubmit", prompt="Redraw the pipeline figure")
     time.sleep(1.5)
