@@ -11,9 +11,43 @@ Built for Hyprland, but any compositor with `wlr-layer-shell` works.
 
 ## How it works
 
+```mermaid
+flowchart LR
+    subgraph agents [Coding agents]
+        claude[Claude Code]
+        codex[Codex]
+        copilot[Copilot CLI]
+        opencode[OpenCode]
+    end
+    hook[maneki hook]
+    daemon["maneki daemon<br/>GTK4 layer-shell island"]
+    you((You))
+    claude -->|hook| hook
+    codex -->|hook| hook
+    copilot -->|hook| hook
+    opencode -->|plugin| hook
+    hook -->|unix socket| daemon
+    daemon -->|sessions and requests| you
+    you -->|click or Super+Alt+Y / N| daemon
+    daemon -.->|allow / deny| hook
+    hook -.->|answer| agents
 ```
-Claude Code ──hook (JSON on stdin)──▶ maneki hook ──unix socket──▶ maneki daemon (GTK4 layer-shell)
-            ◀──── allow / deny ◀──────────────── answer ◀──── click or Super+Alt+Y / N
+
+A permission request, step by step:
+
+```mermaid
+sequenceDiagram
+    participant A as Agent
+    participant H as maneki hook
+    participant D as maneki daemon
+    actor U as You
+    A->>H: PermissionRequest (JSON on stdin)
+    H->>D: ask over the unix socket
+    D->>U: card on the island
+    U->>D: Allow (click or Super+Alt+Y)
+    D->>H: answer
+    H->>A: allow
+    Note over A,U: Claude Code also shows its own dialog: the first answer wins
 ```
 
 - Every hook runs `async` except `PermissionRequest` and `SessionEnd`, so Claude
@@ -41,7 +75,7 @@ Each session shows its agent's icon.
 | Claude Code | hooks in `~/.claude/settings.json`               | yes, races the terminal     |
 | Codex       | hooks in `~/.codex/hooks.json`                   | yes, for 60 seconds         |
 | Copilot CLI | hooks in `~/.copilot/hooks/maneki.json`          | yes, for 60 seconds         |
-| OpenCode 2  | plugin in `~/.config/opencode/plugins/maneki.js` | yes, for 60 seconds         |
+| OpenCode    | plugin in `~/.config/opencode/plugins/maneki.js` | yes, for 60 seconds         |
 
 - Codex asks you to review and trust new hooks once: open `/hooks` in Codex.
 - Codex, Copilot and OpenCode wait for the hook before showing their own
@@ -51,7 +85,7 @@ Each session shows its agent's icon.
   also shows requests Copilot would have approved by itself.
 - Copilot's hooks end in `|| true` because a failing `preToolUse` hook makes
   Copilot deny the tool.
-- OpenCode 2 runs plugins inside its background service, so restart it
+- OpenCode runs plugins inside its background service, so restart it
   (`opencode service restart`) after an update. Its plugin event stream does
   not deliver events yet, so turns are followed through its session, tool and
   permission hooks, and `session.wait` marks the end of a turn.
@@ -152,5 +186,12 @@ trademarks of their owners.
 
 ```sh
 make check     # unit tests
-maneki demo     # two fake sessions and a permission request
+maneki demo    # two fake sessions and a permission request
 ```
+
+## License
+
+maneki is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See [LICENSE](LICENSE).
