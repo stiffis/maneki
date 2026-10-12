@@ -39,18 +39,20 @@ Each session shows its agent's icon.
 | Claude Code | hooks in `~/.claude/settings.json`                     | yes, races the terminal     |
 | Codex       | hooks in `~/.codex/hooks.json`                         | yes, for 60 seconds         |
 | Copilot CLI | hooks in `~/.copilot/hooks/perch.json`                 | yes, for 60 seconds         |
-| OpenCode    | plugin in `~/.config/opencode/plugins/perch.js`        | yes, races its dialog       |
+| OpenCode 2  | plugin in `~/.config/opencode/plugins/perch.js`        | yes, for 60 seconds         |
 
 - Codex asks you to review and trust new hooks once: open `/hooks` in Codex.
-- Codex and Copilot wait for the hook before showing their own prompt, so the
-  island gives up after 60 seconds (or at once with **Terminal** or
+- Codex, Copilot and OpenCode wait for the hook before showing their own
+  prompt, so the island gives up after 60 seconds (or at once with **Terminal** or
   `perch terminal`) and hands the request back to them.
 - Copilot asks the hook before checking its own saved approvals, so the island
   also shows requests Copilot would have approved by itself.
 - Copilot's hooks end in `|| true` because a failing `preToolUse` hook makes
   Copilot deny the tool.
-- OpenCode loads plugins when it starts, so restart running sessions after an
-  update.
+- OpenCode 2 runs plugins inside its background service, so restart it
+  (`opencode service restart`) after an update. Its plugin event stream does
+  not deliver events yet, so turns are followed through its session, tool and
+  permission hooks, and `session.wait` marks the end of a turn.
 
 ## Requirements
 
