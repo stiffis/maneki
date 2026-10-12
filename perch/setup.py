@@ -26,6 +26,28 @@ ASYNC_EVENTS = (
     "SubagentStop",
 )
 SYNC_EVENTS = {"SessionEnd": {}, "PermissionRequest": {"timeout": 3600}}
+CLAUDE_HOOKS = [(event, {"async": True}) for event in ASYNC_EVENTS] + list(SYNC_EVENTS.items())
+CODEX_HOOKS = [
+    (event, {"async": True})
+    for event in ("SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStart", "SubagentStop", "Stop")
+] + [
+    ("Interrupt", {"timeout": 3}),
+    ("SessionEnd", {"timeout": 3}),
+    ("PermissionRequest", {"timeout": 3600, "statusMessage": "Waiting for an answer on the perch island"}),
+]
+COPILOT_EVENTS = (
+    ("SessionStart", "SessionStart"),
+    ("SessionEnd", "SessionEnd"),
+    ("UserPromptSubmit", "UserPromptSubmit"),
+    ("PreToolUse", "PreToolUse"),
+    ("PostToolUse", "PostToolUse"),
+    ("PostToolUseFailure", "PostToolUseFailure"),
+    ("Stop", "Stop"),
+    ("subagentStart", "SubagentStart"),
+    ("SubagentStop", "SubagentStop"),
+    ("notification", "Notification"),
+    ("errorOccurred", "StopFailure"),
+)
 THEME_FILES = (
     "colors-everforest.css",
     "colors-everforest-light.css",
@@ -62,18 +84,36 @@ def targets(home):
         "startup": hypr / "Startup_Apps.conf",
         "switcher": switcher / "switch-theme.sh",
         "switcher_script": switcher / "perch" / "set-theme.sh",
+        "codex": home / ".codex" / "hooks.json",
+        "copilot": home / ".copilot" / "hooks" / "perch.json",
+        "opencode": home / ".config" / "opencode" / "plugins" / "perch.js",
     }
 
 
 def allowed_paths(home):
     t = targets(home)
-    paths = {t[key] for key in ("settings", "link", "keybinds", "startup", "switcher", "switcher_script")}
+    keys = ("settings", "link", "keybinds", "startup", "switcher", "switcher_script", "codex", "copilot", "opencode")
+    paths = {t[key] for key in keys}
     paths |= {t["config"] / name for name in THEME_FILES + ("colors.css", "style.css")}
     return paths
 
 
-def hook_command(bin_path=BIN):
-    return f"{bin_path} hook"
+def hook_command(bin_path=BIN, agent=None):
+    return f"{bin_path} hook" + (f" --agent {agent}" if agent else "")
+
+
+def copilot_hooks(bin_path=BIN):
+    hooks = {
+        key: [
+            {
+                "type": "command",
+                "bash": f"{hook_command(bin_path, 'copilot')} --event {event} || true",
+                "timeoutSec": 10,
+            }
+        ]
+        for key, event in COPILOT_EVENTS
+    }
+    return json.dumps({"version": 1, "hooks": hooks}, indent=2) + "\n"
 
 
 def keybind_lines(link):
@@ -100,10 +140,10 @@ def digest(text):
     return None if text is None else hashlib.sha256(text.encode()).hexdigest()
 
 
-def merge_hooks(text, command, remove=False):
+def merge_hooks(text, command, remove=False, spec=CLAUDE_HOOKS):
     settings = json.loads(text) if text and text.strip() else {}
     if not isinstance(settings, dict):
-        raise SetupError("settings.json does not hold a JSON object")
+        raise SetupError("a hooks file does not hold a JSON object")
     hooks = settings.get("hooks") or {}
     cleaned = {}
     for event, groups in hooks.items():
@@ -116,9 +156,7 @@ def merge_hooks(text, command, remove=False):
         if kept_groups:
             cleaned[event] = kept_groups
     if not remove:
-        for event in ASYNC_EVENTS:
-            cleaned.setdefault(event, []).append({"hooks": [{"type": "command", "command": command, "async": True}]})
-        for event, extra in SYNC_EVENTS.items():
+        for event, extra in spec:
             cleaned.setdefault(event, []).append({"hooks": [{"type": "command", "command": command, **extra}]})
     if cleaned:
         settings["hooks"] = cleaned
@@ -178,6 +216,13 @@ def edit_file(path, transform, note):
     return Change(path, before, transform(before), note)
 
 
+def managed_file(path, content, note, remove):
+    before = read(path)
+    if remove:
+        return Change(path, before, None, note) if before is not None and before == content else None
+    return Change(path, before, content, note)
+
+
 def link_change(link, target, remove):
     if link.is_symlink():
         current = os.readlink(link)
@@ -207,6 +252,18 @@ def plan(home, remove=False, bin_path=BIN):
     changes.append(
         Change(t["settings"], settings_before, merge_hooks(settings_before, command, remove), "Claude Code hooks")
     )
+    if remove or (home / ".codex").is_dir():
+        codex_before = read(t["codex"])
+        if codex_before is not None or not remove:
+            codex_after = merge_hooks(codex_before, hook_command(bin_path, "codex"), remove, CODEX_HOOKS)
+            if remove and json.loads(codex_after) == {}:
+                codex_after = None
+            changes.append(Change(t["codex"], codex_before, codex_after, "Codex hooks"))
+    if remove or (home / ".copilot").is_dir():
+        changes.append(managed_file(t["copilot"], copilot_hooks(bin_path), "Copilot CLI hooks", remove))
+    if remove or (home / ".config" / "opencode").is_dir():
+        plugin = (INTEGRATIONS / "opencode" / "perch.js").read_text()
+        changes.append(managed_file(t["opencode"], plugin, "OpenCode plugin", remove))
     keys, starts = keybind_lines(link), startup_lines(link)
     if remove:
         changes.append(edit_file(t["keybinds"], lambda text: remove_lines(text, keys), "keybinds"))
@@ -233,6 +290,8 @@ def describe_change(change):
     if change.before is None:
         lines = len(change.after.splitlines())
         return f"+ {change.path}  ({change.note}, new file, {lines} lines)"
+    if change.after is None:
+        return f"- {change.path}  ({change.note}, removed)"
     diff = difflib.unified_diff(
         change.before.splitlines(keepends=True),
         change.after.splitlines(keepends=True),
@@ -289,6 +348,12 @@ def apply(changes, home, stamp=None):
         if change.link:
             apply_link(change)
             results.append(f"✓ {change.note}: {change.path}")
+            continue
+        if change.after is None:
+            backup = change.path.with_name(f"{change.path.name}.perch-{stamp}.bak")
+            shutil.copy2(change.path, backup)
+            change.path.unlink()
+            results.append(f"✓ removed {change.note}: {change.path} (backup: {backup})")
             continue
         backup = write_atomic(change.path, change.after, change.mode, stamp)
         suffix = f" (backup: {backup})" if backup else ""

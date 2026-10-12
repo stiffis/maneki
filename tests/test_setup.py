@@ -132,5 +132,46 @@ class MergeHooksTest(unittest.TestCase):
         self.assertEqual(setup.merge_hooks(once, "x hook"), once)
 
 
+class AgentSetupTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.home = Path(self.tmp.name)
+        for directory in (".codex", ".copilot", ".config/opencode"):
+            (self.home / directory).mkdir(parents=True)
+        self.t = setup.targets(self.home)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_install_and_remove_every_agent(self):
+        setup.apply(setup.plan(self.home), self.home, stamp="T")
+        codex = json.loads(self.t["codex"].read_text())["hooks"]
+        self.assertEqual(codex["PermissionRequest"][0]["hooks"][0]["command"], setup.hook_command(agent="codex"))
+        self.assertTrue(codex["PreToolUse"][0]["hooks"][0]["async"])
+        self.assertEqual(codex["Interrupt"][0]["hooks"][0]["timeout"], 3)
+        copilot = json.loads(self.t["copilot"].read_text())
+        command = copilot["hooks"]["notification"][0]["bash"]
+        self.assertTrue(command.endswith("--agent copilot --event Notification || true"))
+        self.assertNotIn("PermissionRequest", copilot["hooks"])
+        self.assertEqual(self.t["opencode"].read_text(), (setup.INTEGRATIONS / "opencode" / "perch.js").read_text())
+        self.assertEqual(setup.plan(self.home), [])
+        setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
+        for key in ("codex", "copilot", "opencode"):
+            self.assertFalse(self.t[key].exists(), key)
+
+    def test_edited_managed_files_are_not_removed(self):
+        setup.apply(setup.plan(self.home), self.home, stamp="T")
+        self.t["opencode"].write_text("my own plugin")
+        setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
+        self.assertEqual(self.t["opencode"].read_text(), "my own plugin")
+
+    def test_existing_codex_hooks_are_kept(self):
+        mine = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "notify-me"}]}]}}
+        self.t["codex"].write_text(json.dumps(mine))
+        setup.apply(setup.plan(self.home), self.home, stamp="T")
+        setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
+        self.assertEqual(json.loads(self.t["codex"].read_text()), mine)
+
+
 if __name__ == "__main__":
     unittest.main()
