@@ -77,7 +77,13 @@ against the file's hash, and skipped when it is already there.
 | `Super+Alt+N`   | `perch deny`   | deny it                                        |
 | `Super+Alt+A`   | `perch always` | allow it and keep the rule Claude suggested    |
 | `Super+Alt+I`   | `perch toggle` | show idle sessions and recent steps            |
+| `Super+Alt+D`   | `perch dnd`    | do not disturb: only permission requests show  |
 |                 | `perch terminal` | leave the request to the agent's own prompt  |
+
+While a window is truly fullscreen on the focused monitor (not just
+maximized), the island stays quiet the same way, and permission requests
+still show on top. The island follows the focused monitor, so it moves to an
+external screen when you work there.
 
 Click a session to see its recent steps. `perch status` prints the state as
 JSON and `perch quit` stops the island.

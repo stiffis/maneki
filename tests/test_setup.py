@@ -64,6 +64,7 @@ class SetupTest(unittest.TestCase):
         self.assertEqual(settings["hooks"]["Stop"][1]["hooks"][0]["command"], command)
         self.assertEqual(os.readlink(self.t["link"]), str(setup.BIN))
         self.assertIn(f"{self.t['link']} allow", self.t["keybinds"].read_text())
+        self.assertIn(f"bind = $mainMod ALT, D, exec, {self.t['link']} dnd", self.t["keybinds"].read_text())
         self.assertEqual(os.stat(self.t["keybinds"]).st_mode & 0o777, 0o600)
         self.assertIn(setup.SWITCH_LINE, self.t["switcher"].read_text().splitlines())
         colors = (self.t["config"] / "colors.css").read_text()

@@ -128,6 +128,7 @@ def keybind_lines(link):
         f"bind = $mainMod ALT, N, exec, {link} deny",
         f"bind = $mainMod ALT, A, exec, {link} always",
         f"bind = $mainMod ALT, I, exec, {link} toggle",
+        f"bind = $mainMod ALT, D, exec, {link} dnd",
     ]
 
 
