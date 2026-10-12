@@ -1,19 +1,71 @@
 import json
 import posixpath
+import re
 from urllib.parse import urlparse
 
 THINKING = "Thinking…"
+
+AGENT_NAMES = {"claude": "Claude Code", "codex": "Codex", "copilot": "Copilot", "opencode": "OpenCode"}
+
+ALIASES = {
+    "bash": "Bash",
+    "shell": "Bash",
+    "exec_command": "Bash",
+    "powershell": "Bash",
+    "read": "Read",
+    "view": "Read",
+    "edit": "Edit",
+    "str_replace_editor": "Edit",
+    "multiedit": "MultiEdit",
+    "write": "Write",
+    "create": "Write",
+    "glob": "Glob",
+    "list": "Glob",
+    "grep": "Grep",
+    "rg": "Grep",
+    "webfetch": "WebFetch",
+    "web_fetch": "WebFetch",
+    "websearch": "WebSearch",
+    "web_search": "WebSearch",
+    "task": "Agent",
+    "spawn_agent": "Agent",
+    "todowrite": "TodoWrite",
+    "update_todo": "TodoWrite",
+    "update_plan": "TodoWrite",
+    "patch": "apply_patch",
+    "skill": "Skill",
+    "question": "AskUserQuestion",
+    "ask_user": "AskUserQuestion",
+    "askuserquestion": "AskUserQuestion",
+}
 
 VERBS = {
     "Bash": "run",
     "Edit": "edit",
     "MultiEdit": "edit",
     "NotebookEdit": "edit",
+    "apply_patch": "edit",
     "Write": "write",
     "Read": "read",
     "WebFetch": "fetch",
     "WebSearch": "search the web",
+    "external_directory": "access files outside the project",
 }
+
+PATCH_FILE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
+
+
+def canonical(tool):
+    tool = tool or ""
+    return ALIASES.get(tool.lower(), tool) if not tool.startswith("mcp__") else tool
+
+
+def arg(data, *keys):
+    for key in keys:
+        value = data.get(key)
+        if value:
+            return value
+    return ""
 
 
 def clip(text, limit):
@@ -42,6 +94,10 @@ def file_name(path):
     return posixpath.basename((path or "").rstrip("/")) or (path or "")
 
 
+def path_of(data):
+    return arg(data, "file_path", "filePath", "filepath", "path", "notebook_path")
+
+
 def line_count(text):
     return len((text or "").splitlines())
 
@@ -51,31 +107,53 @@ def mcp_parts(tool):
     return parts[1], "__".join(parts[2:])
 
 
+def patch_text(data):
+    return data.get("command") if isinstance(data.get("command"), str) else arg(data, "patch", "input")
+
+
+def patch_files(data):
+    return PATCH_FILE.findall(patch_text(data) or "")
+
+
+def patch_counts(text):
+    lines = (text or "").splitlines()
+    added = sum(1 for line in lines if line.startswith("+") and not line.startswith("+++"))
+    removed = sum(1 for line in lines if line.startswith("-") and not line.startswith("---"))
+    return removed, added
+
+
 def activity(tool, data):
-    tool = tool or ""
+    tool = canonical(tool)
     data = data if isinstance(data, dict) else {}
     if tool == "Bash":
-        return first_line(data.get("description") or data.get("command")) or "Running a command"
+        return first_line(arg(data, "description", "command", "cmd")) or "Running a command"
     if tool == "Read":
-        return f"Reading {file_name(data.get('file_path'))}"
-    if tool in ("Edit", "MultiEdit"):
-        return f"Editing {file_name(data.get('file_path'))}"
+        return f"Reading {file_name(path_of(data))}"
+    if tool in ("Edit", "MultiEdit", "NotebookEdit"):
+        return f"Editing {file_name(path_of(data))}"
     if tool == "Write":
-        return f"Writing {file_name(data.get('file_path'))}"
-    if tool == "NotebookEdit":
-        return f"Editing {file_name(data.get('notebook_path'))}"
+        return f"Writing {file_name(path_of(data))}"
+    if tool == "apply_patch":
+        files = patch_files(data)
+        if len(files) == 1:
+            return f"Editing {file_name(files[0])}"
+        return f"Editing {len(files)} files" if files else "Applying a patch"
     if tool == "Grep":
-        return f"Searching for {first_line(data.get('pattern'), 40)}"
+        return f"Searching for {first_line(arg(data, 'pattern', 'query'), 40)}"
     if tool == "Glob":
-        return f"Finding {first_line(data.get('pattern'), 40)}"
+        return f"Finding {first_line(arg(data, 'pattern', 'path'), 40)}"
     if tool == "WebFetch":
         return f"Fetching {urlparse(data.get('url') or '').netloc or 'a page'}"
     if tool == "WebSearch":
         return f"Searching the web for {first_line(data.get('query'), 40)}"
     if tool in ("Agent", "Task"):
-        return f"Agent: {first_line(data.get('description'), 50)}"
+        return f"Agent: {first_line(arg(data, 'description', 'prompt', 'message'), 50)}"
     if tool == "TodoWrite":
         return "Updating the plan"
+    if tool == "AskUserQuestion":
+        return "Has a question for you"
+    if tool == "external_directory":
+        return f"Accessing {arg(data, 'parentDir') or posixpath.dirname(path_of(data))}"
     if tool == "Skill":
         return f"Using skill {data.get('skill', '')}".strip()
     if tool.startswith("mcp__"):
@@ -85,7 +163,7 @@ def activity(tool, data):
 
 
 def ask_title(tool):
-    tool = tool or ""
+    tool = canonical(tool)
     if tool in VERBS:
         return f"wants to {VERBS[tool]}"
     if tool.startswith("mcp__"):
@@ -99,33 +177,41 @@ def compact(data, limit):
 
 
 def ask_detail(tool, data):
+    tool = canonical(tool)
     data = data if isinstance(data, dict) else {}
     if tool == "Bash":
-        return clip((data.get("command") or "").strip(), 600)
+        command = arg(data, "command", "cmd")
+        command = " ".join(command) if isinstance(command, list) else command
+        return clip(command.strip(), 600)
     if tool == "Edit":
-        removed, added = line_count(data.get("old_string")), line_count(data.get("new_string"))
-        return f"{data.get('file_path', '')}\n−{removed} +{added} lines"
+        old, new = arg(data, "old_string", "oldString"), arg(data, "new_string", "newString")
+        return f"{path_of(data)}\n−{line_count(old)} +{line_count(new)} lines"
     if tool == "MultiEdit":
         edits = data.get("edits") or []
         removed = sum(line_count(e.get("old_string")) for e in edits)
         added = sum(line_count(e.get("new_string")) for e in edits)
-        return f"{data.get('file_path', '')}\n{len(edits)} edits, −{removed} +{added} lines"
+        return f"{path_of(data)}\n{len(edits)} edits, −{removed} +{added} lines"
     if tool == "Write":
-        return f"{data.get('file_path', '')}\n{line_count(data.get('content'))} lines"
-    if tool == "NotebookEdit":
-        return data.get("notebook_path", "")
-    if tool == "Read":
-        return data.get("file_path", "")
+        return f"{path_of(data)}\n{line_count(data.get('content'))} lines"
+    if tool == "apply_patch":
+        removed, added = patch_counts(patch_text(data))
+        return "\n".join(patch_files(data) + [f"−{removed} +{added} lines"])
+    if tool in ("NotebookEdit", "Read"):
+        return path_of(data)
     if tool == "WebFetch":
         return data.get("url", "")
     if tool == "WebSearch":
         return data.get("query", "")
+    if tool == "external_directory":
+        return path_of(data) or "\n".join(data.get("patterns") or [])
+    if data.get("patterns") and isinstance(data["patterns"], list):
+        return clip("\n".join(map(str, data["patterns"])), 600)
     return compact(data, 300)
 
 
 def pick_suggestion(suggestions):
     for suggestion in suggestions or []:
-        if isinstance(suggestion, dict) and suggestion.get("type") in ("addRules", "addDirectories"):
+        if isinstance(suggestion, dict) and suggestion.get("type") in ("addRules", "addDirectories", "opencode"):
             if suggestion.get("type") == "addRules" and suggestion.get("behavior") != "allow":
                 continue
             return suggestion
@@ -145,4 +231,6 @@ def always_label(suggestion):
         return f"Always allow {rules}"
     if suggestion.get("type") == "addDirectories":
         return "Always allow access to " + ", ".join(suggestion.get("directories") or [])
+    if suggestion.get("type") == "opencode":
+        return "Always allow " + ", ".join(suggestion.get("patterns") or [])
     return "Always allow"

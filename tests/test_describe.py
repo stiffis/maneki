@@ -70,5 +70,37 @@ class DurationTest(unittest.TestCase):
         self.assertEqual(describe.duration(3600 + 5 * 60 + 9), "1h 5m")
 
 
+class OtherAgentsTest(unittest.TestCase):
+    PATCH = "*** Begin Patch\n*** Update File: src/app.py\n@@\n-old\n+new\n+more\n*** Add File: notes.md\n+hi\n*** End Patch"
+
+    def test_tool_names_from_other_agents(self):
+        self.assertEqual(describe.activity("view", {"path": "/a/b.c"}), "Reading b.c")
+        self.assertEqual(describe.activity("read", {"filePath": "/a/x.ts"}), "Reading x.ts")
+        self.assertEqual(describe.activity("task", {"description": "Map files"}), "Agent: Map files")
+        self.assertEqual(describe.ask_title("bash"), "wants to run")
+
+    def test_codex_patches(self):
+        data = {"command": self.PATCH}
+        self.assertEqual(describe.activity("apply_patch", data), "Editing 2 files")
+        self.assertEqual(describe.ask_detail("apply_patch", data), "src/app.py\nnotes.md\n−1 +3 lines")
+
+    def test_opencode_edit_detail(self):
+        data = {"filePath": "/p/a.py", "oldString": "a", "newString": "a\nb"}
+        self.assertEqual(describe.ask_detail("edit", data), "/p/a.py\n−1 +2 lines")
+
+    def test_opencode_outside_folder(self):
+        data = {"filepath": "/etc/hostname", "parentDir": "/etc", "patterns": ["/etc/*"]}
+        self.assertEqual(describe.ask_title("external_directory"), "wants to access files outside the project")
+        self.assertEqual(describe.ask_detail("external_directory", data), "/etc/hostname")
+        self.assertEqual(describe.activity("external_directory", data), "Accessing /etc")
+
+    def test_unknown_permissions_show_their_patterns(self):
+        self.assertEqual(describe.ask_detail("doom_loop", {"patterns": ["a", "b"]}), "a\nb")
+
+    def test_opencode_always(self):
+        suggestion = describe.pick_suggestion([{"type": "opencode", "patterns": ["git *"]}])
+        self.assertEqual(describe.always_label(suggestion), "Always allow git *")
+
+
 if __name__ == "__main__":
     unittest.main()
