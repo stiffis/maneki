@@ -155,7 +155,10 @@ class AgentSetupTest(unittest.TestCase):
         permission = copilot["hooks"]["PermissionRequest"][0]
         self.assertEqual(permission["timeoutSec"], 90)
         self.assertTrue(permission["bash"].endswith("--event PermissionRequest || true"))
-        self.assertEqual(self.t["opencode"].read_text(), (setup.INTEGRATIONS / "opencode" / "perch.js").read_text())
+        plugin = self.t["opencode"].read_text()
+        self.assertIn(f'const PERCH = "{setup.BIN}"', plugin)
+        self.assertNotIn("__PERCH_BIN__", plugin)
+        self.assertNotIn("node:net", plugin)
         self.assertEqual(setup.plan(self.home), [])
         setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
         for key in ("codex", "copilot", "opencode"):

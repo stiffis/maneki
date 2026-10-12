@@ -1,36 +1,30 @@
-import { connect } from "node:net"
-import { join } from "node:path"
+import { spawn } from "node:child_process"
 
-const runtime = process.env.XDG_RUNTIME_DIR || `/tmp/perch-${process.getuid()}`
-const socketPath = join(runtime, "perch", "perch.sock")
+const PERCH = "__PERCH_BIN__"
 
-const talk = (message, wantsReply) =>
+const hook = (name, payload, wantsAnswer) =>
   new Promise((resolve) => {
-    const socket = connect(socketPath)
-    let buffer = ""
-    let settled = false
-    const finish = (value) => {
-      if (settled) return
-      settled = true
-      socket.destroy()
-      resolve(value)
+    let output = ""
+    let child
+    try {
+      child = spawn(PERCH, ["hook", "--agent", "opencode", "--event", name], {
+        stdio: ["pipe", wantsAnswer ? "pipe" : "ignore", "ignore"],
+      })
+    } catch {
+      resolve(null)
+      return
     }
-    socket.on("connect", () => {
-      socket.write(JSON.stringify(message) + "\n")
-      if (!wantsReply) socket.end(() => finish(null))
-    })
-    socket.on("data", (chunk) => {
-      buffer += chunk
-      const end = buffer.indexOf("\n")
-      if (end < 0) return
+    child.on("error", () => resolve(null))
+    if (wantsAnswer) child.stdout.on("data", (chunk) => (output += chunk))
+    child.on("close", () => {
       try {
-        finish(JSON.parse(buffer.slice(0, end)))
+        resolve(output ? JSON.parse(output) : null)
       } catch {
-        finish(null)
+        resolve(null)
       }
     })
-    socket.on("error", () => finish(null))
-    socket.on("close", () => finish(null))
+    child.stdin.on("error", () => {})
+    child.stdin.end(JSON.stringify(payload))
   })
 
 const replies = { allow: "once", always: "always", deny: "reject" }
@@ -41,20 +35,16 @@ export const PerchPlugin = async ({ client, directory }) => {
   const busy = new Set()
   const launches = new Map()
 
-  const event = (sessionID, name, extra = {}) => {
+  const payload = (sessionID, extra = {}) => {
     const parent = parents.get(sessionID)
     return {
-      hook_event_name: name,
       session_id: parent ?? sessionID,
       cwd: directory,
-      agent: "opencode",
-      pid: process.pid,
-      ts: Date.now() / 1000,
       ...(parent ? { agent_id: sessionID, agent_type: kinds.get(sessionID) } : {}),
       ...extra,
     }
   }
-  const emit = (sessionID, name, extra) => talk({ type: "event", event: event(sessionID, name, extra) }, false)
+  const emit = (sessionID, name, extra) => hook(name, payload(sessionID, extra), false)
 
   const started = (info) => {
     if (!info?.id) return
@@ -98,17 +88,17 @@ export const PerchPlugin = async ({ client, directory }) => {
     const tool = request.permission ?? request.type ?? "permission"
     const data = { ...(request.metadata ?? {}), patterns }
     if (tool === "bash" && !data.command && patterns.length) data.command = patterns.join("\n")
-    const message = {
-      type: "ask",
-      event: event(request.sessionID, "PermissionRequest", {
+    const result = await hook(
+      "PermissionRequest",
+      payload(request.sessionID, {
         tool_name: tool,
         tool_input: data,
         tool_use_id: request.id,
         permission_suggestions: [{ type: "opencode", patterns: request.always?.length ? request.always : patterns }],
       }),
-    }
-    const reply = await talk(message, true)
-    if (reply?.answer) await answer(request, reply.answer)
+      true,
+    )
+    if (result?.answer) await answer(request, result.answer)
   }
 
   return {
@@ -132,16 +122,16 @@ export const PerchPlugin = async ({ client, directory }) => {
         case "session.deleted":
           if (props.info?.id && !parents.has(props.info.id)) emit(props.info.id, "SessionEnd")
           break
-        case "permission.asked":
-        case "permission.updated":
-          asked(props)
-          break
         case "question.asked":
           if (props.sessionID) emit(props.sessionID, "PreToolUse", { tool_name: "AskUserQuestion", tool_input: {}, tool_use_id: props.id })
           break
         case "question.replied":
         case "question.rejected":
           if (props.sessionID) emit(props.sessionID, "PostToolUse", { tool_name: "AskUserQuestion", tool_input: {}, tool_use_id: props.requestID ?? props.id })
+          break
+        case "permission.asked":
+        case "permission.updated":
+          asked(props)
           break
         case "permission.replied":
           emit(props.sessionID, "PermissionResolved", { tool_use_id: props.requestID ?? props.permissionID })

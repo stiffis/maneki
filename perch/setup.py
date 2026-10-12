@@ -104,6 +104,10 @@ def hook_command(bin_path=BIN, agent=None):
     return f"{bin_path} hook" + (f" --agent {agent}" if agent else "")
 
 
+def opencode_plugin(bin_path=BIN):
+    return (INTEGRATIONS / "opencode" / "perch.js").read_text().replace("__PERCH_BIN__", str(bin_path))
+
+
 def copilot_hooks(bin_path=BIN):
     hooks = {
         key: [
@@ -264,8 +268,7 @@ def plan(home, remove=False, bin_path=BIN):
     if remove or (home / ".copilot").is_dir():
         changes.append(managed_file(t["copilot"], copilot_hooks(bin_path), "Copilot CLI hooks", remove))
     if remove or (home / ".config" / "opencode").is_dir():
-        plugin = (INTEGRATIONS / "opencode" / "perch.js").read_text()
-        changes.append(managed_file(t["opencode"], plugin, "OpenCode plugin", remove))
+        changes.append(managed_file(t["opencode"], opencode_plugin(bin_path), "OpenCode plugin", remove))
     keys, starts = keybind_lines(link), startup_lines(link)
     if remove:
         changes.append(edit_file(t["keybinds"], lambda text: remove_lines(text, keys), "keybinds"))
