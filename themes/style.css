@@ -8,7 +8,7 @@ window.perch {
     border: 2px solid var(--border);
     border-radius: 0;
     padding: 6px 12px;
-    min-width: 440px;
+    min-width: 380px;
     font-size: 13px;
 }
 

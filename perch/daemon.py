@@ -38,7 +38,7 @@ AGENT_SYMBOL = {"running": "↳", "ok": "✓", "error": "✗"}
 MAX_ASKS = 2
 MAX_AGENTS = 4
 MAX_STEPS = 6
-DETAIL_CHARS = 46
+DETAIL_CHARS = 40
 TOP_MARGIN = 6
 ICON_SIZE = 14
 HINT = "Super+Alt+Y allow · Super+Alt+N deny"
@@ -617,9 +617,9 @@ class Island:
             who = f"{who} › {ask.agent}"
         heading = Gtk.Box(spacing=8)
         heading.append(self.icon(agent))
-        heading.append(label(f"{who} {describe.ask_title(ask.tool)}", "ask-title", width=60))
+        heading.append(label(f"{who} {describe.ask_title(ask.tool)}", "ask-title", width=52))
         card.append(heading)
-        detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=60, lines=DETAIL_LINES)
+        detail = label(describe.ask_detail(ask.tool, ask.data), "ask-detail", wrap=True, width=52, lines=DETAIL_LINES)
         detail.set_width_chars(DETAIL_CHARS)
         card.append(detail)
         self.shown_at.setdefault(ask.id, time.monotonic())
@@ -628,7 +628,7 @@ class Island:
             self.arm_later(ask.id)
         reviewable = self.reviewable(ask)
         if not reviewable:
-            card.append(label("Too long to review here. Answer it in the terminal.", "warning", wrap=True, width=60))
+            card.append(label("Too long to review here. Answer it in the terminal.", "warning", wrap=True, width=52))
         buttons = Gtk.Box(spacing=6, homogeneous=True)
         choices = [("allow", "Allow"), ("deny", "Deny")]
         if ask.suggestion:
@@ -647,7 +647,7 @@ class Island:
             buttons.append(button)
         card.append(buttons)
         if ask.suggestion and reviewable:
-            card.append(label(describe.always_scope(ask.suggestion), "hint", wrap=True, width=60))
+            card.append(label(describe.always_scope(ask.suggestion), "hint", wrap=True, width=52))
         if first:
             card.add_css_class("target")
             card.append(label(HINT, "hint", "keys"))
@@ -675,7 +675,7 @@ class Island:
         text = session.activity
         if session.status == DONE and session.message:
             text = describe.first_line(session.message, 120)
-        activity = label(text, "activity", width=42)
+        activity = label(text, "activity", width=34)
         activity.set_hexpand(True)
         row.append(activity)
         row.append(self.clock(lambda at, s=session: describe.duration(s.elapsed(at)), now))
@@ -690,22 +690,22 @@ class Island:
         box.add_css_class(agent.state)
         top = Gtk.Box(spacing=8)
         top.append(label(AGENT_SYMBOL.get(agent.state, "↳"), "branch"))
-        name = label(agent.label, "agent-name", width=40)
+        name = label(agent.label, "agent-name", width=32)
         name.set_hexpand(True)
         top.append(name)
         top.append(label(f"{agent.steps} {'step' if agent.steps == 1 else 'steps'}", "meta"))
         top.append(self.clock(lambda at, a=agent: describe.duration(a.elapsed(at)), now))
         box.append(top)
-        box.append(label(agent.activity, "agent-activity", width=52))
+        box.append(label(agent.activity, "agent-activity", width=44))
         return box
 
     def session_details(self, session):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         box.add_css_class("details")
         for step in list(session.steps)[-MAX_STEPS:]:
-            box.append(label(f"{STEP_SYMBOL[step.state]} {step.label}", "step", step.state, width=56))
+            box.append(label(f"{STEP_SYMBOL[step.state]} {step.label}", "step", step.state, width=48))
         if session.message:
-            box.append(label(session.message, "message", wrap=True, width=56, lines=4))
+            box.append(label(session.message, "message", wrap=True, width=48, lines=4))
         if not session.steps and not session.message:
             box.append(label("No steps yet", "step"))
         return box
