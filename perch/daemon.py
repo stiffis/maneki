@@ -47,6 +47,7 @@ FEELING_SECONDS = 3.2
 BLINK_EVERY_MS = 4200
 BLINK_MS = 160
 MASCOT_GAP = 6
+BUBBLE_GAP = 4
 
 
 def pid_alive(pid):
@@ -91,7 +92,6 @@ class Mascot:
         self.area.set_draw_func(self.draw)
         self.bubble = Gtk.Label()
         self.bubble.add_css_class("bubble")
-        self.bubble.set_halign(Gtk.Align.END)
         self.bubble.set_valign(Gtk.Align.START)
         self.bubble.set_can_target(False)
         self.state = mascots.IDLE
@@ -214,6 +214,7 @@ class Island:
         self.moods = {}
         self.clickable = []
         self.input_rects = None
+        self.sides = None
 
     def start(self):
         self.server = Server(socket_path(), self.on_message, self.on_close)
@@ -595,24 +596,23 @@ class Island:
         mascot.wake()
         detach(mascot.area)
         detach(mascot.bubble)
-        row = Gtk.Box(spacing=MASCOT_GAP)
-        row.set_valign(Gtk.Align.START)
-        row.append(mascot.area)
+        speaker = Gtk.Box(spacing=BUBBLE_GAP)
+        speaker.set_valign(Gtk.Align.START)
+        speaker.append(mascot.bubble)
+        speaker.append(mascot.area)
         if alone:
             self.clickable = []
-            mascot.bubble.set_valign(Gtk.Align.CENTER)
-            row.append(mascot.bubble)
-            return row
-        overlay = Gtk.Overlay()
-        overlay.set_valign(Gtk.Align.START)
-        overlay.set_margin_top(TOP_MARGIN)
-        overlay.set_child(island)
-        mascot.bubble.set_valign(Gtk.Align.START)
-        overlay.add_overlay(mascot.bubble)
-        row.append(overlay)
+            return speaker
+        island.set_valign(Gtk.Align.START)
+        island.set_margin_top(TOP_MARGIN)
         balance = Gtk.Box()
-        balance.set_size_request(mascot.area.get_content_width(), 1)
-        row.append(balance)
+        self.sides = Gtk.SizeGroup(mode=Gtk.SizeGroupMode.HORIZONTAL)
+        self.sides.add_widget(speaker)
+        self.sides.add_widget(balance)
+        row = Gtk.Box(spacing=MASCOT_GAP)
+        row.set_valign(Gtk.Align.START)
+        for widget in (speaker, island, balance):
+            row.append(widget)
         self.clickable = [island]
         return row
 
