@@ -1,6 +1,6 @@
 # maneki
 
-[![tests](https://github.com/stiffis/maneki/actions/workflows/tests.yml/badge.svg)](https://github.com/stiffis/maneki/actions/workflows/tests.yml)
+[![tests](https://github.com/stiffis/maneki/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/stiffis/maneki/actions/workflows/tests.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![GTK 4.16+](https://img.shields.io/badge/GTK-4.16%2B-4A86CF?logo=gtk&logoColor=white)](https://www.gtk.org/)
 [![gtk4-layer-shell](https://img.shields.io/badge/gtk4--layer--shell-1.x-4A86CF)](https://github.com/wmww/gtk4-layer-shell)
