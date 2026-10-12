@@ -120,10 +120,10 @@ class AgentPayloadTest(unittest.TestCase):
         self.assertNotIn("tool_use_id", event)
 
     def test_answering_agents_wait_and_others_do_not(self):
-        for agent in ("claude", "codex", "copilot"):
+        for agent in ("claude", "codex", "copilot", "opencode"):
             event = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, agent)
             self.assertTrue(hook.wants_answer(event), agent)
-        other = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, "opencode")
+        other = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, "mystery")
         self.assertFalse(hook.wants_answer(other))
 
     def test_copilot_gets_its_documented_top_level_decision(self):
@@ -185,6 +185,14 @@ class WaitLimitTest(unittest.TestCase):
 class CodexPidTest(unittest.TestCase):
     def test_codex_reports_no_pid_because_its_hooks_run_in_the_shared_daemon(self):
         self.assertIsNone(hook.agent_pid(hook.PROCESSES["codex"]))
+
+
+class OpencodeAnswerTest(unittest.TestCase):
+    def test_opencode_gets_a_plain_answer(self):
+        with mock.patch.object(hook, "ask", return_value="always"):
+            stdout = io.StringIO()
+            hook.run(io.StringIO('{"tool_name": "bash", "tool_input": {"command": "ls"}}'), stdout, "opencode", "PermissionRequest")
+            self.assertEqual(json.loads(stdout.getvalue()), {"answer": "always"})
 
 
 if __name__ == "__main__":

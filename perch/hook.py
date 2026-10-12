@@ -56,8 +56,8 @@ EVENTS = {
     "errorOccurred": "StopFailure",
 }
 TOOL_EVENTS = ("PreToolUse", "PostToolUse", "PostToolUseFailure")
-PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",)}
-ANSWERING_AGENTS = ("claude", "codex", "copilot")
+PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",), "opencode": ("opencode",)}
+ANSWERING_AGENTS = ("claude", "codex", "copilot", "opencode")
 WAIT_LIMITS = {"codex": 60, "copilot": 60}
 EMPTY_JSON_EVENTS = {"codex": ("Stop", "SubagentStop", "Interrupt")}
 LIMITS = {"prompt": 300, "message": 300, "title": 120, "last_assistant_message": 400, "error": 300}
@@ -196,7 +196,10 @@ def run(stdin, stdout, agent="claude", event_name=None):
     output = None
     if wants_answer(event):
         answer = ask(event, WAIT_LIMITS.get(agent))
-        output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")), agent)
+        if agent == "opencode":
+            output = {"answer": answer} if answer else None
+        else:
+            output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")), agent)
     else:
         proto.send({"type": "event", "event": event})
     if output is None and event["hook_event_name"] in EMPTY_JSON_EVENTS.get(agent, ()):
