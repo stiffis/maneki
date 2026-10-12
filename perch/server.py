@@ -4,7 +4,10 @@ import socket
 
 from gi.repository import GLib
 
-from . import proto
+from . import proto, trust
+
+MAX_LINE = 1 << 20
+MAX_CONNECTIONS = 256
 
 
 class AlreadyRunning(Exception):
@@ -12,9 +15,10 @@ class AlreadyRunning(Exception):
 
 
 class Connection:
-    def __init__(self, server, sock):
+    def __init__(self, server, sock, pid):
         self.server = server
         self.sock = sock
+        self.pid = pid
         self.buffer = bytearray()
         self.closed = False
         self.ask_id = None
@@ -33,6 +37,9 @@ class Connection:
             self.close()
             return False
         self.buffer += chunk
+        if b"\n" not in self.buffer and len(self.buffer) > MAX_LINE:
+            self.close()
+            return False
         while b"\n" in self.buffer and not self.closed:
             line, _, rest = self.buffer.partition(b"\n")
             self.buffer = bytearray(rest)
@@ -104,8 +111,12 @@ class Server:
             sock, _ = self.sock.accept()
         except OSError:
             return True
+        pid, uid = trust.peer(sock)
+        if uid != os.getuid() or len(self.connections) >= MAX_CONNECTIONS:
+            sock.close()
+            return True
         sock.setblocking(False)
-        self.connections.add(Connection(self, sock))
+        self.connections.add(Connection(self, sock, pid))
         return True
 
     def closed(self, connection):
