@@ -97,6 +97,15 @@ your own overrides. It reloads them when a file in `~/.config/perch` changes.
 and light); `~/theme-switcher/perch/set-theme.sh` swaps it with the rest of the
 desktop.
 
+## Performance
+
+The island draws with GTK's cairo renderer, which keeps it near 90 MB instead
+of the 200 MB the GPU renderer loads (Vulkan and LLVM); run it with
+`GSK_RENDERER=vulkan` to use the GPU anyway. It redraws at most ten times a
+second and a working session's dot beats once a second, so the island stays
+near 0.3% of one core while agents work. Each hook event costs about 40 ms of
+CPU in the agent's process, most of it Python and `json` starting up.
+
 ## Uninstall
 
 ```sh
