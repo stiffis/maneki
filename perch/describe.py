@@ -1,6 +1,8 @@
 import json
+import math
 import posixpath
 import re
+import unicodedata
 from urllib.parse import urlparse
 
 THINKING = "Thinking…"
@@ -53,6 +55,13 @@ VERBS = {
 }
 
 PATCH_FILE = re.compile(r"^\*\*\* (?:Update|Add|Delete) File: (.+)$", re.M)
+DESTINATIONS = {
+    "session": "this session",
+    "localSettings": "this project, only for you",
+    "projectSettings": "this project, for everyone",
+    "userSettings": "all your projects",
+}
+REVIEW_LIMIT = 600
 
 
 def canonical(tool):
@@ -172,6 +181,34 @@ def ask_title(tool):
     return f"wants to use {tool}"
 
 
+GAP = re.compile(r"[ \t]{8,}")
+
+
+def reveal(text):
+    shown = "".join(
+        char if char in "\n\t" or unicodedata.category(char) not in ("Cc", "Cf", "Co", "Cs", "Zl", "Zp") else f"⟦U+{ord(char):04X}⟧"
+        for char in text or ""
+    )
+    return GAP.sub(lambda gap: f" ⟦{len(gap.group())} spaces⟧ ", shown)
+
+
+def full_detail(tool, data):
+    tool = canonical(tool)
+    data = data if isinstance(data, dict) else {}
+    if tool == "Bash":
+        command = arg(data, "command", "cmd")
+        return (" ".join(command) if isinstance(command, list) else command).strip()
+    return ask_detail(tool, data)
+
+
+def reviewable(tool, data, width, lines):
+    text = reveal(full_detail(tool, data))
+    if len(text) > REVIEW_LIMIT or text.endswith("…"):
+        return False
+    rows = sum(max(1, math.ceil(len(line) / width)) for line in text.split("\n"))
+    return rows <= lines
+
+
 def compact(data, limit):
     return clip(json.dumps(data, ensure_ascii=False, separators=(", ", ": ")), limit)
 
@@ -221,6 +258,15 @@ def pick_suggestion(suggestions):
 def rule_text(rule):
     content = rule.get("ruleContent")
     return f"{rule.get('toolName', '')}({content})" if content else rule.get("toolName", "")
+
+
+def always_scope(suggestion):
+    if not suggestion:
+        return ""
+    where = DESTINATIONS.get(suggestion.get("destination"), "")
+    if suggestion.get("type") == "opencode":
+        where = "this session"
+    return f"{always_label(suggestion)} for {where}" if where else always_label(suggestion)
 
 
 def always_label(suggestion):

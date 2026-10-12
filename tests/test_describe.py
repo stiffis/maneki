@@ -102,5 +102,27 @@ class OtherAgentsTest(unittest.TestCase):
         self.assertEqual(describe.always_label(suggestion), "Always allow git *")
 
 
+class RevealTest(unittest.TestCase):
+    def test_invisible_and_bidi_characters_become_visible(self):
+        self.assertEqual(describe.reveal("ls\u202e x\u200b"), "ls⟦U+202E⟧ x⟦U+200B⟧")
+
+    def test_long_gaps_are_named(self):
+        self.assertEqual(describe.reveal("echo ok" + " " * 400 + "; rm -rf ~"), "echo ok ⟦400 spaces⟧ ; rm -rf ~")
+
+    def test_newlines_and_short_spaces_stay(self):
+        self.assertEqual(describe.reveal("a  b\nc\td"), "a  b\nc\td")
+
+    def test_hidden_tails_cannot_be_approved_from_the_island(self):
+        long_command = {"command": "echo ok; " + "x" * 700}
+        self.assertFalse(describe.reviewable("Bash", long_command, 46, 6))
+        many_lines = {"command": "\n".join(["true"] * 7) + "\nrm -rf ~"}
+        self.assertFalse(describe.reviewable("Bash", many_lines, 46, 6))
+        self.assertTrue(describe.reviewable("Bash", {"command": "make check"}, 46, 6))
+
+    def test_always_scope_names_where_the_rule_is_saved(self):
+        rule = {"type": "addRules", "rules": [{"toolName": "Bash", "ruleContent": "make check"}], "behavior": "allow", "destination": "userSettings"}
+        self.assertEqual(describe.always_scope(rule), "Always allow Bash(make check) for all your projects")
+
+
 if __name__ == "__main__":
     unittest.main()
