@@ -4,7 +4,7 @@ import tomllib
 from .mascots import SPRITES
 from .paths import config_dir
 
-DEFAULTS = {"mascot": "cat", "mascot_scale": 1}
+DEFAULTS = {"mascot": "cat", "mascot_scale": 2}
 MASCOTS = (*SPRITES, "none")
 SCALES = range(1, 5)
 

@@ -1,3 +1,4 @@
+import math
 import os
 import signal
 import sys
@@ -7,6 +8,7 @@ from ctypes import CDLL
 os.environ.setdefault("GSK_RENDERER", "cairo")
 CDLL("libgtk4-layer-shell.so")
 
+import cairo  # noqa: E402
 import gi  # noqa: E402
 
 gi.require_version("Gdk", "4.0")
@@ -44,6 +46,7 @@ FRAME_MS = 280
 FEELING_SECONDS = 3.2
 BLINK_EVERY_MS = 4200
 BLINK_MS = 160
+MASCOT_GAP = 6
 
 
 def pid_alive(pid):
@@ -208,6 +211,8 @@ class Island:
         self.settings = config.load()
         self.mascot = None
         self.moods = {}
+        self.clickable = []
+        self.input_rects = None
 
     def start(self):
         self.server = Server(socket_path(), self.on_message, self.on_close)
@@ -218,6 +223,7 @@ class Island:
         app.hold()
         self.window = Gtk.Window(application=app, title="perch")
         self.window.add_css_class("perch")
+        self.window.connect("realize", self.watch_paint)
         LayerShell.init_for_window(self.window)
         LayerShell.set_namespace(self.window, "perch")
         LayerShell.set_layer(self.window, LayerShell.Layer.TOP)
@@ -243,6 +249,22 @@ class Island:
             self.answer(ask_id, None)
         if self.server:
             self.server.stop()
+
+    def watch_paint(self, window):
+        window.get_frame_clock().connect("after-paint", self.fit_input)
+
+    def fit_input(self, *args):
+        rects = []
+        for widget in self.clickable:
+            found, bounds = widget.compute_bounds(self.window)
+            if found:
+                x, y = math.floor(bounds.get_x()), math.floor(bounds.get_y())
+                rects.append((x, y, math.ceil(bounds.get_width()), math.ceil(bounds.get_height())))
+        surface = self.window.get_surface()
+        if surface is None or rects == self.input_rects:
+            return
+        self.input_rects = rects
+        surface.set_input_region(cairo.Region([cairo.RectangleInt(*rect) for rect in rects]))
 
     def css_text(self):
         colors = config_dir() / "colors.css"
@@ -553,30 +575,37 @@ class Island:
         return GLib.SOURCE_REMOVE
 
     def wrap(self, content, mascot, asking, alone):
-        island = Gtk.Box(spacing=10)
+        island = Gtk.Box()
         island.add_css_class("island")
         if asking:
             island.add_css_class("asking")
+        content.set_hexpand(True)
+        island.append(content)
         if mascot is None:
-            content.set_hexpand(True)
-            island.append(content)
+            self.clickable = [island]
             return island
         mascot.wake()
         detach(mascot.area)
         detach(mascot.bubble)
-        island.append(mascot.area)
+        row = Gtk.Box(spacing=MASCOT_GAP)
+        row.set_valign(Gtk.Align.START)
+        row.append(mascot.area)
         if alone:
-            island.add_css_class("alone")
+            self.clickable = []
             mascot.bubble.set_valign(Gtk.Align.CENTER)
-            island.append(mascot.bubble)
-            return island
-        content.set_hexpand(True)
-        island.append(content)
-        mascot.bubble.set_valign(Gtk.Align.START)
+            row.append(mascot.bubble)
+            return row
         overlay = Gtk.Overlay()
+        overlay.set_valign(Gtk.Align.START)
         overlay.set_child(island)
+        mascot.bubble.set_valign(Gtk.Align.START)
         overlay.add_overlay(mascot.bubble)
-        return overlay
+        row.append(overlay)
+        balance = Gtk.Box()
+        balance.set_size_request(mascot.area.get_content_width(), 1)
+        row.append(balance)
+        self.clickable = [island]
+        return row
 
     def ask_card(self, ask, names, first):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)

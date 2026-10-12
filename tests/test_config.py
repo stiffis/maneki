@@ -12,8 +12,8 @@ class ParseTest(unittest.TestCase):
         self.assertEqual(config.parse(""), (config.DEFAULTS, []))
 
     def test_a_known_mascot_and_scale_are_used(self):
-        settings, problems = config.parse('mascot = "osaka"\nmascot_scale = 2\n')
-        self.assertEqual(settings, {"mascot": "osaka", "mascot_scale": 2})
+        settings, problems = config.parse('mascot = "osaka"\nmascot_scale = 3\n')
+        self.assertEqual(settings, {"mascot": "osaka", "mascot_scale": 3})
         self.assertEqual(problems, [])
 
     def test_the_mascot_can_be_turned_off(self):

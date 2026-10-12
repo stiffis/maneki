@@ -16,10 +16,6 @@ window.perch {
     border-color: var(--asking);
 }
 
-.island.alone {
-    min-width: 0;
-}
-
 .bubble {
     background-color: var(--bg);
     color: var(--text);
