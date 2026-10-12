@@ -1,5 +1,13 @@
 # maneki
 
+[![tests](https://github.com/stiffis/maneki/actions/workflows/tests.yml/badge.svg)](https://github.com/stiffis/maneki/actions/workflows/tests.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![GTK 4.16+](https://img.shields.io/badge/GTK-4.16%2B-4A86CF?logo=gtk&logoColor=white)](https://www.gtk.org/)
+[![gtk4-layer-shell](https://img.shields.io/badge/gtk4--layer--shell-1.x-4A86CF)](https://github.com/wmww/gtk4-layer-shell)
+[![Wayland](https://img.shields.io/badge/Wayland-wlr--layer--shell-FFBC00?logo=wayland&logoColor=black)](https://wayland.freedesktop.org/)
+[![Hyprland](https://img.shields.io/badge/Hyprland-ready-58E1FF?logo=hyprland&logoColor=black)](https://hyprland.org/)
+[![License: GPL v3+](https://img.shields.io/badge/license-GPL--3.0--or--later-A42E2B?logo=gnu&logoColor=white)](LICENSE)
+
 A small island at the top of the screen that keeps an eye on your coding agent
 sessions (Claude Code, Codex, GitHub Copilot CLI and OpenCode): what each one
 is doing, when it finishes, and the permission requests you can answer without
@@ -92,8 +100,9 @@ Each session shows its agent's icon.
 
 ## Requirements
 
-Python 3.10+, `python-gobject`, `gtk4` (4.16+ for CSS variables) and
-`gtk4-layer-shell`.
+Python 3.11+ (for `tomllib`), `python-gobject`, `gtk4` (4.16+ for CSS
+variables) and `gtk4-layer-shell`. Developed on Python 3.14, GTK 4.24 and
+gtk4-layer-shell 1.3.
 
 ## Install
 
