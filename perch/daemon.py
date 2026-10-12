@@ -4,6 +4,7 @@ import sys
 import time
 from ctypes import CDLL
 
+os.environ.setdefault("GSK_RENDERER", "cairo")
 CDLL("libgtk4-layer-shell.so")
 
 import gi  # noqa: E402
@@ -25,6 +26,7 @@ ANSWERS = ("allow", "deny", "always", "terminal")
 GRANTS = ("allow", "always")
 GUARDED = ANSWERS + ("quit", "dnd")
 NOTICE_SECONDS = 1.5
+RENDER_INTERVAL = 0.1
 DESKTOP_DELAY_MS = 120
 ARM_SECONDS = 0.8
 DETAIL_LINES = 6
@@ -69,10 +71,13 @@ class Island:
         self.expanded = False
         self.opened = set()
         self.clocks = []
+        self.beating = []
+        self.beat = False
         self.icons = {}
         self.shown_at = {}
         self.arming = set()
         self.render_queued = False
+        self.last_render = 0.0
         self.reload_queued = False
         self.dnd = False
         self.fullscreen = False
@@ -305,7 +310,16 @@ class Island:
         if self.follow_transcripts(now) or changed:
             self.queue_render()
         self.update_clocks(now)
+        self.update_beat()
         return GLib.SOURCE_CONTINUE
+
+    def update_beat(self):
+        self.beat = not self.beat
+        for widget in self.beating:
+            if self.beat:
+                widget.add_css_class("beat")
+            else:
+                widget.remove_css_class("beat")
 
     def icon(self, agent):
         agent = agent if agent in describe.AGENT_NAMES else "unknown"
@@ -336,8 +350,13 @@ class Island:
         return widget
 
     def queue_render(self):
-        if not self.render_queued and self.window is not None:
-            self.render_queued = True
+        if self.render_queued or self.window is None:
+            return
+        self.render_queued = True
+        wait = self.last_render + RENDER_INTERVAL - time.monotonic()
+        if wait > 0:
+            GLib.timeout_add(int(wait * 1000) + 1, self.render)
+        else:
             GLib.idle_add(self.render)
 
     def toggle_session(self, session_id):
@@ -346,7 +365,9 @@ class Island:
 
     def render(self):
         self.render_queued = False
+        self.last_render = time.monotonic()
         self.clocks = []
+        self.beating = []
         now = time.time()
         quiet = self.dnd or self.fullscreen
         sessions = [] if quiet else self.board.visible(self.expanded)
@@ -441,7 +462,10 @@ class Island:
     def session_row(self, session, names, now):
         row = Gtk.Box(spacing=8)
         row.add_css_class("session")
-        row.append(label(STATUS_SYMBOL.get(session.status, "●"), "dot", session.status))
+        dot = label(STATUS_SYMBOL.get(session.status, "●"), "dot", session.status)
+        if session.status in ("working", "attention"):
+            self.beating.append(dot)
+        row.append(dot)
         row.append(self.icon(session.agent))
         row.append(label(names[session.id], "name"))
         text = session.activity

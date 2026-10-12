@@ -26,7 +26,6 @@ window.perch {
 
 .dot.working {
     color: var(--working);
-    animation: perch-pulse 1.4s ease-in-out infinite;
 }
 
 .dot.asking {
@@ -35,7 +34,10 @@ window.perch {
 
 .dot.attention {
     color: var(--attention);
-    animation: perch-pulse 0.9s ease-in-out infinite;
+}
+
+.dot.beat {
+    opacity: 0.35;
 }
 
 .dot.done {
@@ -44,12 +46,6 @@ window.perch {
 
 .dot.idle {
     color: var(--muted);
-}
-
-@keyframes perch-pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.25; }
-    100% { opacity: 1; }
 }
 
 .name {
