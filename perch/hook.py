@@ -1,10 +1,9 @@
-import hashlib
 import json
 import os
 import sys
 import time
 
-from . import describe, proto
+from . import proto
 
 KEEP = (
     "hook_event_name",
@@ -69,7 +68,7 @@ DENY_MESSAGE = "The user denied this from perch."
 
 def clip(value, limit=STRING_LIMIT):
     if isinstance(value, str):
-        return describe.clip(value, limit)
+        return value if len(value) <= limit else value[: limit - 1] + "…"
     if isinstance(value, dict):
         return {key: clip(item, limit) for key, item in value.items()}
     if isinstance(value, list):
@@ -90,6 +89,8 @@ def normalize(payload, event_name=None):
     name = event_name or payload.get("hook_event_name") or ""
     payload["hook_event_name"] = EVENTS.get(name, name)
     if payload["hook_event_name"] in TOOL_EVENTS and not payload.get("tool_use_id"):
+        import hashlib
+
         signature = json.dumps([payload.get("tool_name"), payload.get("tool_input")], sort_keys=True, default=str)
         payload["tool_use_id"] = "h" + hashlib.sha1(signature.encode()).hexdigest()[:16]
     return payload
@@ -199,7 +200,9 @@ def run(stdin, stdout, agent="claude", event_name=None):
         if agent == "opencode":
             output = {"answer": answer} if answer else None
         else:
-            output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")), agent)
+            from .describe import pick_suggestion
+
+            output = decision_output(answer, pick_suggestion(event.get("permission_suggestions")), agent)
     else:
         proto.send({"type": "event", "event": event})
     if output is None and event["hook_event_name"] in EMPTY_JSON_EVENTS.get(agent, ()):
