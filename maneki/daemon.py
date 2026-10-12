@@ -223,11 +223,11 @@ class Island:
         if self.window is not None:
             return
         app.hold()
-        self.window = Gtk.Window(application=app, title="perch")
-        self.window.add_css_class("perch")
+        self.window = Gtk.Window(application=app, title="maneki")
+        self.window.add_css_class("maneki")
         self.window.connect("realize", self.watch_paint)
         LayerShell.init_for_window(self.window)
-        LayerShell.set_namespace(self.window, "perch")
+        LayerShell.set_namespace(self.window, "maneki")
         LayerShell.set_layer(self.window, LayerShell.Layer.TOP)
         LayerShell.set_anchor(self.window, LayerShell.Edge.TOP, True)
         LayerShell.set_margin(self.window, LayerShell.Edge.TOP, TOP_MARGIN)
@@ -243,7 +243,7 @@ class Island:
         try:
             self.events = hypr.Events(self.desktop_event)
         except OSError as error:
-            print(f"perch: not following Hyprland: {error}", file=sys.stderr)
+            print(f"maneki: not following Hyprland: {error}", file=sys.stderr)
         self.render()
 
     def shutdown(self, app):
@@ -284,7 +284,7 @@ class Island:
         try:
             self.provider.load_from_string(self.css_text())
         except OSError as error:
-            print(f"perch: could not read the theme: {error}", file=sys.stderr)
+            print(f"maneki: could not read the theme: {error}", file=sys.stderr)
         return GLib.SOURCE_REMOVE
 
     def watch_css(self):
@@ -726,7 +726,7 @@ def main():
     try:
         island.start()
     except AlreadyRunning:
-        print("perch: the island is already running", file=sys.stderr)
+        print("maneki: the island is already running", file=sys.stderr)
         return 1
     app.connect("activate", island.activate)
     app.connect("shutdown", island.shutdown)

@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perch import hook
+from maneki import hook
 
 
 class ReduceTest(unittest.TestCase):
@@ -75,7 +75,7 @@ class DecisionTest(unittest.TestCase):
     def test_deny_tells_claude_why(self):
         decision = hook.decision_output("deny", None)["hookSpecificOutput"]["decision"]
         self.assertEqual(decision["behavior"], "deny")
-        self.assertIn("perch", decision["message"])
+        self.assertIn("maneki", decision["message"])
 
     def test_no_answer_means_no_output(self):
         self.assertIsNone(hook.decision_output(None, None))
@@ -153,8 +153,8 @@ class LauncherTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             for pid, comm, ppid, args in [
-                (30, "python3", 20, [b"/usr/bin/python3", b"-I", b"/x/perch"]),
-                (20, "bash", 10, [b"bash", b"-c", b"perch hook --agent copilot"]),
+                (30, "python3", 20, [b"/usr/bin/python3", b"-I", b"/x/maneki"]),
+                (20, "bash", 10, [b"bash", b"-c", b"maneki hook --agent copilot"]),
                 (10, "node", 1, [b"node", b"/usr/bin/copilot"]),
             ]:
                 directory = root / str(pid)
@@ -170,9 +170,9 @@ class WaitLimitTest(unittest.TestCase):
         import threading
 
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmp}):
-            os.makedirs(os.path.join(tmp, "perch"))
+            os.makedirs(os.path.join(tmp, "maneki"))
             server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            server.bind(os.path.join(tmp, "perch", "perch.sock"))
+            server.bind(os.path.join(tmp, "maneki", "maneki.sock"))
             server.listen(1)
             held = []
             threading.Thread(target=lambda: held.append(server.accept()), daemon=True).start()

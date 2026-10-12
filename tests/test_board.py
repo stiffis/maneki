@@ -1,6 +1,6 @@
 import unittest
 
-from perch.board import ASKING, DONE, IDLE, WORKING, Board
+from maneki.board import ASKING, DONE, IDLE, WORKING, Board
 
 
 def event(name, ts, session="s1", **fields):

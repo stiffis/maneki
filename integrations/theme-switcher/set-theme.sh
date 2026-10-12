@@ -5,7 +5,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../lib.sh"
 set -euo pipefail
 
 THEME="${1:-}"
-PERCH_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/perch"
+MANEKI_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/maneki"
 
 case "$THEME" in
     0) VARIANT="colors-${FAMILY}.css"; LABEL="$FAMILY_LABEL Dark" ;;
@@ -13,18 +13,18 @@ case "$THEME" in
     *) echo "Usage: ./set-theme.sh <0|1>"; exit 1 ;;
 esac
 
-if [ ! -d "$PERCH_DIR" ]; then
-    echo "⚠ perch is not set up, skipping"
+if [ ! -d "$MANEKI_DIR" ]; then
+    echo "⚠ maneki is not set up, skipping"
     exit 0
 fi
 
-if [ ! -f "$PERCH_DIR/$VARIANT" ]; then
-    echo "✗ Missing perch colors: $PERCH_DIR/$VARIANT"
+if [ ! -f "$MANEKI_DIR/$VARIANT" ]; then
+    echo "✗ Missing maneki colors: $MANEKI_DIR/$VARIANT"
     exit 1
 fi
 
-TMP="$(mktemp "$PERCH_DIR/.colors.XXXXXX")"
-cp "$PERCH_DIR/$VARIANT" "$TMP"
+TMP="$(mktemp "$MANEKI_DIR/.colors.XXXXXX")"
+cp "$MANEKI_DIR/$VARIANT" "$TMP"
 chmod 644 "$TMP"
-mv -f "$TMP" "$PERCH_DIR/colors.css"
-echo "✓ perch theme set to: $LABEL (reloads by itself)"
+mv -f "$TMP" "$MANEKI_DIR/colors.css"
+echo "✓ maneki theme set to: $LABEL (reloads by itself)"

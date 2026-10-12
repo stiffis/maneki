@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perch import transcript
+from maneki import transcript
 
 
 def line(entry):

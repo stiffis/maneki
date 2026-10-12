@@ -63,7 +63,7 @@ LIMITS = {"prompt": 300, "message": 300, "title": 120, "last_assistant_message":
 STRING_LIMIT = 4000
 LIST_LIMIT = 50
 PASS_THROUGH_TOOLS = {"AskUserQuestion", "ExitPlanMode"}
-DENY_MESSAGE = "The user denied this from perch."
+DENY_MESSAGE = "The user denied this from maneki."
 
 
 def clip(value, limit=STRING_LIMIT):

@@ -1,8 +1,8 @@
 import itertools
 import unittest
 
-from perch import mascots
-from perch.mascots import ASKING, DONE, IDLE, INTERRUPTED, SPRITES, STATES, WORKING
+from maneki import mascots
+from maneki.mascots import ASKING, DONE, IDLE, INTERRUPTED, SPRITES, STATES, WORKING
 
 
 def poses(sprite):

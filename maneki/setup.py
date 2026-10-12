@@ -33,7 +33,7 @@ CODEX_HOOKS = [
 ] + [
     ("Interrupt", {"timeout": 3}),
     ("SessionEnd", {"timeout": 3}),
-    ("PermissionRequest", {"timeout": 3600, "statusMessage": "Waiting for an answer on the perch island"}),
+    ("PermissionRequest", {"timeout": 3600, "statusMessage": "Waiting for an answer on the maneki island"}),
 ]
 COPILOT_EVENTS = (
     ("SessionStart", "SessionStart"),
@@ -58,7 +58,7 @@ THEME_FILES = (
 )
 FAMILIES = ("everforest", "gruvbox")
 SWITCH_ANCHOR = 'run_step "Aplicando tema swaync"            swaync/set-theme.sh      "$MODE"'
-SWITCH_LINE = 'run_step "Aplicando tema perch"             perch/set-theme.sh       "$MODE"'
+SWITCH_LINE = 'run_step "Aplicando tema maneki"            maneki/set-theme.sh      "$MODE"'
 
 
 class SetupError(Exception):
@@ -80,15 +80,15 @@ def targets(home):
     switcher = home / "theme-switcher"
     return {
         "settings": home / ".claude" / "settings.json",
-        "link": home / ".local" / "bin" / "perch",
-        "config": home / ".config" / "perch",
+        "link": home / ".local" / "bin" / "maneki",
+        "config": home / ".config" / "maneki",
         "keybinds": hypr / "UserKeybinds.conf",
         "startup": hypr / "Startup_Apps.conf",
         "switcher": switcher / "switch-theme.sh",
-        "switcher_script": switcher / "perch" / "set-theme.sh",
+        "switcher_script": switcher / "maneki" / "set-theme.sh",
         "codex": home / ".codex" / "hooks.json",
-        "copilot": home / ".copilot" / "hooks" / "perch.json",
-        "opencode": home / ".config" / "opencode" / "plugins" / "perch.js",
+        "copilot": home / ".copilot" / "hooks" / "maneki.json",
+        "opencode": home / ".config" / "opencode" / "plugins" / "maneki.js",
     }
 
 
@@ -105,7 +105,7 @@ def hook_command(bin_path=BIN, agent=None):
 
 
 def opencode_plugin(bin_path=BIN):
-    return (INTEGRATIONS / "opencode" / "perch.js").read_text().replace("__PERCH_BIN__", str(bin_path))
+    return (INTEGRATIONS / "opencode" / "maneki.js").read_text().replace("__MANEKI_BIN__", str(bin_path))
 
 
 def copilot_hooks(bin_path=BIN):
@@ -313,7 +313,7 @@ def write_atomic(path, text, mode, stamp):
     backup = None
     if real.exists():
         mode = stat.S_IMODE(real.stat().st_mode)
-        backup = real.with_name(f"{real.name}.perch-{stamp}.bak")
+        backup = real.with_name(f"{real.name}.maneki-{stamp}.bak")
         shutil.copy2(real, backup)
     descriptor, temporary = tempfile.mkstemp(dir=real.parent, prefix=f".{real.name}.", suffix=".tmp")
     try:
@@ -335,7 +335,7 @@ def apply_link(change):
         if change.path.is_symlink() and os.readlink(change.path) == change.before:
             change.path.unlink()
         return
-    temporary = change.path.with_name(f".{change.path.name}.perch-tmp")
+    temporary = change.path.with_name(f".{change.path.name}.maneki-tmp")
     temporary.unlink(missing_ok=True)
     os.symlink(change.after, temporary)
     os.replace(temporary, change.path)
@@ -356,7 +356,7 @@ def apply(changes, home, stamp=None):
             results.append(f"✓ {change.note}: {change.path}")
             continue
         if change.after is None:
-            backup = change.path.with_name(f"{change.path.name}.perch-{stamp}.bak")
+            backup = change.path.with_name(f"{change.path.name}.maneki-{stamp}.bak")
             shutil.copy2(change.path, backup)
             change.path.unlink()
             results.append(f"✓ removed {change.note}: {change.path} (backup: {backup})")
@@ -372,7 +372,7 @@ def main(apply_changes=False, remove=False, home=None):
     try:
         changes = plan(home, remove)
     except (SetupError, ValueError) as error:
-        print(f"perch setup: {error}", file=sys.stderr)
+        print(f"maneki setup: {error}", file=sys.stderr)
         return 1
     if not changes:
         print("Nothing to do: everything is already " + ("removed." if remove else "in place."))
@@ -387,10 +387,10 @@ def main(apply_changes=False, remove=False, home=None):
         for line in apply(changes, home):
             print(line)
     except (SetupError, OSError) as error:
-        print(f"perch setup: {error}", file=sys.stderr)
+        print(f"maneki setup: {error}", file=sys.stderr)
         return 1
     if remove:
-        print("\nLeft in place: ~/.config/perch and ~/theme-switcher/perch (delete them by hand if you want).")
+        print("\nLeft in place: ~/.config/maneki and ~/theme-switcher/maneki (delete them by hand if you want).")
     else:
-        print("\nStart the island now with: hyprctl dispatch exec perch daemon")
+        print("\nStart the island now with: hyprctl dispatch exec maneki daemon")
     return 0

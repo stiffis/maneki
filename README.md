@@ -1,16 +1,18 @@
-# perch
+# maneki
 
 A small island at the top of the screen that keeps an eye on your coding agent
 sessions (Claude Code, Codex, GitHub Copilot CLI and OpenCode): what each one
 is doing, when it finishes, and the permission requests you can answer without
-going back to the terminal.
+going back to the terminal. The name comes from the maneki-neko, the lucky cat
+that raises its paw to call you over, which is what the island does when an
+agent needs you.
 
 Built for Hyprland, but any compositor with `wlr-layer-shell` works.
 
 ## How it works
 
 ```
-Claude Code ──hook (JSON on stdin)──▶ perch hook ──unix socket──▶ perch daemon (GTK4 layer-shell)
+Claude Code ──hook (JSON on stdin)──▶ maneki hook ──unix socket──▶ maneki daemon (GTK4 layer-shell)
             ◀──── allow / deny ◀──────────────── answer ◀──── click or Super+Alt+Y / N
 ```
 
@@ -20,7 +22,7 @@ Claude Code ──hook (JSON on stdin)──▶ perch hook ──unix socket─�
   answer wins. If you answer in the terminal, the island sees the result in the
   session transcript and drops the card.
 - If the island is not running, the hook exits at once and Claude behaves as if
-  perch did not exist.
+  maneki did not exist.
 - `AskUserQuestion` and plan approvals stay in the terminal; the island only
   shows that the session needs you.
 - A session leaves the island on `SessionEnd`, when its `claude` process exits,
@@ -34,17 +36,17 @@ Claude Code ──hook (JSON on stdin)──▶ perch hook ──unix socket─�
 
 Each session shows its agent's icon.
 
-| Agent       | How it connects                                        | Permissions from the island |
-| ----------- | ------------------------------------------------------ | --------------------------- |
-| Claude Code | hooks in `~/.claude/settings.json`                     | yes, races the terminal     |
-| Codex       | hooks in `~/.codex/hooks.json`                         | yes, for 60 seconds         |
-| Copilot CLI | hooks in `~/.copilot/hooks/perch.json`                 | yes, for 60 seconds         |
-| OpenCode 2  | plugin in `~/.config/opencode/plugins/perch.js`        | yes, for 60 seconds         |
+| Agent       | How it connects                                  | Permissions from the island |
+| ----------- | ------------------------------------------------ | --------------------------- |
+| Claude Code | hooks in `~/.claude/settings.json`               | yes, races the terminal     |
+| Codex       | hooks in `~/.codex/hooks.json`                   | yes, for 60 seconds         |
+| Copilot CLI | hooks in `~/.copilot/hooks/maneki.json`          | yes, for 60 seconds         |
+| OpenCode 2  | plugin in `~/.config/opencode/plugins/maneki.js` | yes, for 60 seconds         |
 
 - Codex asks you to review and trust new hooks once: open `/hooks` in Codex.
 - Codex, Copilot and OpenCode wait for the hook before showing their own
   prompt, so the island gives up after 60 seconds (or at once with **Terminal** or
-  `perch terminal`) and hands the request back to them.
+  `maneki terminal`) and hands the request back to them.
 - Copilot asks the hook before checking its own saved approvals, so the island
   also shows requests Copilot would have approved by itself.
 - Copilot's hooks end in `|| true` because a failing `preToolUse` hook makes
@@ -62,33 +64,33 @@ Python 3.10+, `python-gobject`, `gtk4` (4.16+ for CSS variables) and
 ## Install
 
 ```sh
-perch setup            # dry run: prints every change as a diff
-perch setup --apply    # makes them, with timestamped backups
+maneki setup            # dry run: prints every change as a diff
+maneki setup --apply    # makes them, with timestamped backups
 ```
 
-Setup links `~/.local/bin/perch`, copies the themes to `~/.config/perch`, adds
+Setup links `~/.local/bin/maneki`, copies the themes to `~/.config/maneki`, adds
 the hooks to `~/.claude/settings.json`, the keybinds and autostart to Hyprland's
 `UserConfigs`, and a step to `~/theme-switcher`. Each edit is atomic, checked
 against the file's hash, and skipped when it is already there.
 
 ## Use
 
-| Keys            | Command        | What it does                                   |
-| --------------- | -------------- | ---------------------------------------------- |
-| `Super+Alt+Y`   | `perch allow`  | allow the oldest pending request               |
-| `Super+Alt+N`   | `perch deny`   | deny it                                        |
-| `Super+Alt+A`   | `perch always` | allow it and keep the rule Claude suggested    |
-| `Super+Alt+I`   | `perch toggle` | show idle sessions and recent steps            |
-| `Super+Alt+D`   | `perch dnd`    | do not disturb: only permission requests show  |
-|                 | `perch terminal` | leave the request to the agent's own prompt  |
+| Keys          | Command           | What it does                                  |
+| ------------- | ----------------- | --------------------------------------------- |
+| `Super+Alt+Y` | `maneki allow`    | allow the oldest pending request              |
+| `Super+Alt+N` | `maneki deny`     | deny it                                       |
+| `Super+Alt+A` | `maneki always`   | allow it and keep the rule Claude suggested   |
+| `Super+Alt+I` | `maneki toggle`   | show idle sessions and recent steps           |
+| `Super+Alt+D` | `maneki dnd`      | do not disturb: only permission requests show |
+|               | `maneki terminal` | leave the request to the agent's own prompt   |
 
 While a window is truly fullscreen on the focused monitor (not just
 maximized), the island stays quiet the same way, and permission requests
 still show on top. The island follows the focused monitor, so it moves to an
 external screen when you work there.
 
-Click a session to see its recent steps. `perch status` prints the state as
-JSON and `perch quit` stops the island.
+Click a session to see its recent steps. `maneki status` prints the state as
+JSON and `maneki quit` stops the island.
 
 ## Mascot
 
@@ -100,7 +102,7 @@ now and then. It never takes clicks: only the island does. In do not disturb,
 the mascot still pops up alone for a moment to show that something finished or
 was interrupted.
 
-Pick it in `~/.config/perch/config.toml`; the island reloads the file when it
+Pick it in `~/.config/maneki/config.toml`; the island reloads the file when it
 changes:
 
 ```toml
@@ -110,15 +112,15 @@ mascot_scale = 2   # 1 to 4 screen pixels per sprite pixel (default 2)
 
 The cat is an orange tabby. Osaka is Ayumu Kasuga from Azumanga Daioh, drawn
 as fan art for personal use; she is not original art. The sprites live as text
-grids in `perch/mascots.py`.
+grids in `maneki/mascots.py`.
 
 ## Theming
 
-The island loads `~/.config/perch/colors.css`, then the base `themes/style.css`
-from this repo, then `~/.config/perch/style.css`, which starts empty and holds
-your own overrides. It reloads them when a file in `~/.config/perch` changes.
+The island loads `~/.config/maneki/colors.css`, then the base `themes/style.css`
+from this repo, then `~/.config/maneki/style.css`, which starts empty and holds
+your own overrides. It reloads them when a file in `~/.config/maneki` changes.
 `colors.css` is a copy of one of the four variants (everforest, gruvbox, dark
-and light); `~/theme-switcher/perch/set-theme.sh` swaps it with the rest of the
+and light); `~/theme-switcher/maneki/set-theme.sh` swaps it with the rest of the
 desktop.
 
 ## Performance
@@ -133,11 +135,11 @@ CPU in the agent's process, most of it Python and `json` starting up.
 ## Uninstall
 
 ```sh
-perch setup --remove           # dry run
-perch setup --remove --apply
+maneki setup --remove           # dry run
+maneki setup --remove --apply
 ```
 
-`~/.config/perch` and `~/theme-switcher/perch` are left in place.
+`~/.config/maneki` and `~/theme-switcher/maneki` are left in place.
 
 ## Icons
 
@@ -149,5 +151,5 @@ trademarks of their owners.
 
 ```sh
 make check     # unit tests
-perch demo     # two fake sessions and a permission request
+maneki demo     # two fake sessions and a permission request
 ```

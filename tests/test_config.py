@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perch import config
+from maneki import config
 
 
 class ParseTest(unittest.TestCase):
@@ -33,7 +33,7 @@ class LoadTest(unittest.TestCase):
         patcher = mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": self.home.name})
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.file = Path(self.home.name) / "perch" / "config.toml"
+        self.file = Path(self.home.name) / "maneki" / "config.toml"
 
     def test_a_missing_file_gives_the_defaults(self):
         self.assertEqual(config.load(), config.DEFAULTS)

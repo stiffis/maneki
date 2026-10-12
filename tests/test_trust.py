@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from perch import proto, trust
+from maneki import proto, trust
 
 
 def fake_proc(root, chain):
@@ -26,14 +26,14 @@ class CallerTest(unittest.TestCase):
 
     def test_keybinds_launched_by_hyprland_are_you(self):
         self.assertTrue(self.check([
-            (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/perch", "allow"]),
-            (20, "sh", 10, ["/bin/sh", "-c", "perch allow"]),
+            (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/maneki", "allow"]),
+            (20, "sh", 10, ["/bin/sh", "-c", "maneki allow"]),
             (10, "Hyprland", 1, ["Hyprland"]),
         ]))
 
     def test_your_own_terminal_is_you(self):
         self.assertTrue(self.check([
-            (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/perch", "allow"]),
+            (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/maneki", "allow"]),
             (20, "zsh", 15, ["zsh"]),
             (15, "kitty", 10, ["kitty"]),
             (10, "Hyprland", 1, ["Hyprland"]),
@@ -42,8 +42,8 @@ class CallerTest(unittest.TestCase):
     def test_anything_run_by_an_agent_is_not_you(self):
         for agent in (["claude"], ["opencode"], ["node", "/usr/bin/copilot"], ["codex"]):
             chain = [
-                (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/perch", "allow"]),
-                (20, "zsh", 15, ["zsh", "-c", "perch allow"]),
+                (30, "python3", 20, ["/usr/bin/python3", "-I", "/x/maneki", "allow"]),
+                (20, "zsh", 15, ["zsh", "-c", "maneki allow"]),
                 (15, "node-MainThread" if agent[0] == "node" else agent[0], 12, agent),
                 (12, "kitty", 10, ["kitty"]),
                 (10, "Hyprland", 1, ["Hyprland"]),
@@ -52,7 +52,7 @@ class CallerTest(unittest.TestCase):
 
     def test_orphans_are_not_you(self):
         self.assertFalse(self.check([
-            (30, "python3", 1, ["/usr/bin/python3", "-I", "/x/perch", "allow"]),
+            (30, "python3", 1, ["/usr/bin/python3", "-I", "/x/maneki", "allow"]),
         ]))
 
     def test_a_vanished_process_is_not_you(self):
@@ -60,7 +60,7 @@ class CallerTest(unittest.TestCase):
 
 
 class GenuineDaemonTest(unittest.TestCase):
-    def make(self, tmp, args, script_name="perch"):
+    def make(self, tmp, args, script_name="maneki"):
         root = Path(tmp) / "proc"
         root.mkdir()
         bin_dir = Path(tmp) / "repo" / "bin"
@@ -84,7 +84,7 @@ class GenuineDaemonTest(unittest.TestCase):
             lambda s: [sys.executable, "-S", s, "daemon"],
             lambda s: [sys.executable, "-I", s, "demo"],
             lambda s: [sys.executable, "-I", "/tmp/evil.py", "daemon"],
-            lambda s: ["/usr/bin/nc", "-lU", "perch.sock"],
+            lambda s: ["/usr/bin/nc", "-lU", "maneki.sock"],
         ]
         for args in cases:
             with tempfile.TemporaryDirectory() as tmp:
@@ -94,9 +94,9 @@ class GenuineDaemonTest(unittest.TestCase):
 
 class FakeIslandTest(unittest.TestCase):
     def serve(self, tmp):
-        os.makedirs(os.path.join(tmp, "perch"))
+        os.makedirs(os.path.join(tmp, "maneki"))
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        server.bind(os.path.join(tmp, "perch", "perch.sock"))
+        server.bind(os.path.join(tmp, "maneki", "maneki.sock"))
         server.listen(4)
 
         def answer_everything():
@@ -111,7 +111,7 @@ class FakeIslandTest(unittest.TestCase):
         threading.Thread(target=answer_everything, daemon=True).start()
         return server
 
-    def test_hooks_ignore_an_island_that_is_not_perch(self):
+    def test_hooks_ignore_an_island_that_is_not_maneki(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmp}):
             server = self.serve(tmp)
             self.assertIsNone(proto.connect())
@@ -120,7 +120,7 @@ class FakeIslandTest(unittest.TestCase):
 
     def test_runtime_dir_never_falls_back_to_tmp(self):
         with mock.patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(proto.runtime_dir(), f"/run/user/{os.getuid()}/perch")
+            self.assertEqual(proto.runtime_dir(), f"/run/user/{os.getuid()}/maneki")
 
 
 if __name__ == "__main__":

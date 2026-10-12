@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process"
 
-const PERCH = "__PERCH_BIN__"
+const MANEKI = "__MANEKI_BIN__"
 
 const hook = (name, payload, wantsAnswer) =>
   new Promise((resolve) => {
     let output = ""
     let child
     try {
-      child = spawn(PERCH, ["hook", "--agent", "opencode", "--event", name], {
+      child = spawn(MANEKI, ["hook", "--agent", "opencode", "--event", name], {
         stdio: ["pipe", wantsAnswer ? "pipe" : "ignore", "ignore"],
       })
     } catch {
@@ -30,7 +30,7 @@ const hook = (name, payload, wantsAnswer) =>
 const effects = { allow: "allow", always: "allow", deny: "deny" }
 
 export default {
-  id: "perch",
+  id: "maneki",
   setup: async (context) => {
     const directory = context.location?.directory
     const parents = new Map()

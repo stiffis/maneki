@@ -5,7 +5,7 @@ import tempfile
 import threading
 import unittest
 
-from perch import hypr
+from maneki import hypr
 
 LAPTOP = {"name": "eDP-1", "focused": True, "activeWorkspace": {"id": 1}, "specialWorkspace": {"id": 0, "name": ""}}
 SAMSUNG = {"name": "HDMI-A-1", "focused": False, "activeWorkspace": {"id": 4}, "specialWorkspace": {"id": 0, "name": ""}}

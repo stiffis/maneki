@@ -37,8 +37,8 @@ def load():
     except FileNotFoundError:
         return dict(DEFAULTS)
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
-        print(f"perch: ignoring {path}: {error}", file=sys.stderr)
+        print(f"maneki: ignoring {path}: {error}", file=sys.stderr)
         return dict(DEFAULTS)
     for problem in problems:
-        print(f"perch: {path}: {problem}", file=sys.stderr)
+        print(f"maneki: {path}: {problem}", file=sys.stderr)
     return settings

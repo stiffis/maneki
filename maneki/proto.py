@@ -7,11 +7,11 @@ from . import trust
 
 def runtime_dir():
     base = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-    return os.path.join(base, "perch")
+    return os.path.join(base, "maneki")
 
 
 def socket_file():
-    return os.path.join(runtime_dir(), "perch.sock")
+    return os.path.join(runtime_dir(), "maneki.sock")
 
 
 def encode(message) -> bytes:

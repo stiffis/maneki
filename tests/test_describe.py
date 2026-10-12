@@ -1,6 +1,6 @@
 import unittest
 
-from perch import describe
+from maneki import describe
 
 
 class ActivityTest(unittest.TestCase):

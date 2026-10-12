@@ -3,7 +3,7 @@ import sys
 
 from . import proto
 
-NOT_RUNNING = "perch: the island is not running (start it with `perch daemon`)"
+NOT_RUNNING = "maneki: the island is not running (start it with `maneki daemon`)"
 COMMANDS = {
     "allow": "allow the oldest pending permission request",
     "deny": "deny the oldest pending permission request",
@@ -20,7 +20,7 @@ def parser():
     import argparse
 
     root = argparse.ArgumentParser(
-        prog="perch",
+        prog="maneki",
         description="A small island at the top of the screen that keeps an eye on your Claude Code sessions.",
     )
     sub = root.add_subparsers(dest="command", required=True, metavar="command")
@@ -43,7 +43,7 @@ def send_command(name):
     if name == "status":
         print(json.dumps(reply, indent=2, ensure_ascii=False))
     elif not reply.get("ok"):
-        print(f"perch: {reply.get('error', 'failed')}", file=sys.stderr)
+        print(f"maneki: {reply.get('error', 'failed')}", file=sys.stderr)
     return 0 if reply.get("ok") else 1
 
 

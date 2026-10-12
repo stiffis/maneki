@@ -4,7 +4,7 @@ from pathlib import Path
 from . import proto
 
 ROOT = Path(__file__).resolve().parent.parent
-BIN = ROOT / "bin" / "perch"
+BIN = ROOT / "bin" / "maneki"
 THEMES = ROOT / "themes"
 ICONS = ROOT / "icons"
 INTEGRATIONS = ROOT / "integrations"
@@ -20,4 +20,4 @@ def socket_path() -> Path:
 
 def config_dir() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "perch"
+    return Path(base) / "maneki"

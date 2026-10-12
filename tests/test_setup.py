@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from perch import setup
+from maneki import setup
 
 FOREIGN = {"type": "command", "command": "/usr/bin/other-tool"}
 SETTINGS = {"model": "opus", "hooks": {"Stop": [{"hooks": [FOREIGN]}]}}
@@ -73,7 +73,7 @@ class SetupTest(unittest.TestCase):
 
     def test_backups_keep_the_original_files(self):
         self.install()
-        backup = self.t["keybinds"].with_name("UserKeybinds.conf.perch-T.bak")
+        backup = self.t["keybinds"].with_name("UserKeybinds.conf.maneki-T.bak")
         self.assertEqual(backup.read_text(), self.originals["keybinds"])
 
     def test_remove_restores_the_edited_files(self):
@@ -157,10 +157,10 @@ class AgentSetupTest(unittest.TestCase):
         self.assertEqual(permission["timeoutSec"], 90)
         self.assertTrue(permission["bash"].endswith("--event PermissionRequest || true"))
         plugin = self.t["opencode"].read_text()
-        self.assertIn(f'const PERCH = "{setup.BIN}"', plugin)
-        self.assertNotIn("__PERCH_BIN__", plugin)
+        self.assertIn(f'const MANEKI = "{setup.BIN}"', plugin)
+        self.assertNotIn("__MANEKI_BIN__", plugin)
         self.assertNotIn("node:net", plugin)
-        self.assertIn('id: "perch"', plugin)
+        self.assertIn('id: "maneki"', plugin)
         self.assertIn("export default", plugin)
         self.assertEqual(setup.plan(self.home), [])
         setup.apply(setup.plan(self.home, remove=True), self.home, stamp="U")
