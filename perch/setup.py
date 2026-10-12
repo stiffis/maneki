@@ -22,10 +22,11 @@ ASYNC_EVENTS = (
     "Notification",
     "Stop",
     "StopFailure",
+    "SubagentStart",
+    "SubagentStop",
 )
 SYNC_EVENTS = {"SessionEnd": {}, "PermissionRequest": {"timeout": 3600}}
 THEME_FILES = (
-    "style.css",
     "colors-everforest.css",
     "colors-everforest-light.css",
     "colors-gruvbox.css",
@@ -67,7 +68,7 @@ def targets(home):
 def allowed_paths(home):
     t = targets(home)
     paths = {t[key] for key in ("settings", "link", "keybinds", "startup", "switcher", "switcher_script")}
-    paths |= {t["config"] / name for name in THEME_FILES + ("colors.css",)}
+    paths |= {t["config"] / name for name in THEME_FILES + ("colors.css", "style.css")}
     return paths
 
 
@@ -198,6 +199,7 @@ def plan(home, remove=False, bin_path=BIN):
             changes.append(new_file(t["config"] / name, (THEMES / name).read_text(), "theme file"))
         colors = current_colors(home)
         changes.append(new_file(t["config"] / "colors.css", (THEMES / colors).read_text(), f"active colors ({colors})"))
+        changes.append(new_file(t["config"] / "style.css", "", "your style overrides"))
         if t["switcher"].exists():
             script = (INTEGRATIONS / "theme-switcher" / "set-theme.sh").read_text()
             changes.append(new_file(t["switcher_script"], script, "theme-switcher step", 0o755))

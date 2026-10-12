@@ -114,6 +114,14 @@ class SetupTest(unittest.TestCase):
         self.assertIn("hooks", json.loads(self.t["settings"].read_text()))
 
 
+    def test_style_overrides_start_empty_and_subagent_events_are_hooked(self):
+        self.install()
+        self.assertEqual((self.t["config"] / "style.css").read_text(), "")
+        hooks = json.loads(self.t["settings"].read_text())["hooks"]
+        self.assertIn("SubagentStart", hooks)
+        self.assertTrue(hooks["SubagentStop"][0]["hooks"][0]["async"])
+
+
 class MergeHooksTest(unittest.TestCase):
     def test_unchanged_semantics_keep_the_original_text(self):
         text = '{"model":"opus"}'
