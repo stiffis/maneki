@@ -201,6 +201,7 @@ class Island:
         self.fullscreen = False
         self.monitor_name = None
         self.layer = None
+        self.margin = TOP_MARGIN
         self.notice = None
         self.desktop_queued = False
         self.events = None
@@ -414,6 +415,11 @@ class Island:
                 self.monitor_name = name
                 return
 
+    def set_margin(self, margin):
+        if margin != self.margin:
+            LayerShell.set_margin(self.window, LayerShell.Edge.TOP, margin)
+            self.margin = margin
+
     def set_layer(self, overlay):
         layer = LayerShell.Layer.OVERLAY if overlay else LayerShell.Layer.TOP
         if layer != self.layer:
@@ -582,8 +588,10 @@ class Island:
         content.set_hexpand(True)
         island.append(content)
         if mascot is None:
+            self.set_margin(TOP_MARGIN)
             self.clickable = [island]
             return island
+        self.set_margin(0)
         mascot.wake()
         detach(mascot.area)
         detach(mascot.bubble)
@@ -597,6 +605,7 @@ class Island:
             return row
         overlay = Gtk.Overlay()
         overlay.set_valign(Gtk.Align.START)
+        overlay.set_margin_top(TOP_MARGIN)
         overlay.set_child(island)
         mascot.bubble.set_valign(Gtk.Align.START)
         overlay.add_overlay(mascot.bubble)
