@@ -2,6 +2,7 @@ import io
 import json
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -154,6 +155,29 @@ class LauncherTest(unittest.TestCase):
                 (directory / "stat").write_text(f"{pid} ({comm}) S {ppid} 1 1 0\n")
                 (directory / "cmdline").write_bytes(b"\0".join(args) + b"\0")
             self.assertEqual(hook.agent_pid(("copilot",), 30, root), 10)
+
+
+class WaitLimitTest(unittest.TestCase):
+    def test_codex_stops_waiting_and_falls_back_to_its_prompt(self):
+        import socket
+        import threading
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ, {"XDG_RUNTIME_DIR": tmp}):
+            os.makedirs(os.path.join(tmp, "perch"))
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(os.path.join(tmp, "perch", "perch.sock"))
+            server.listen(1)
+            held = []
+            threading.Thread(target=lambda: held.append(server.accept()), daemon=True).start()
+            started = time.monotonic()
+            self.assertIsNone(hook.ask({"hook_event_name": "PermissionRequest"}, 0.2))
+            self.assertLess(time.monotonic() - started, 2)
+            server.close()
+
+
+class CodexPidTest(unittest.TestCase):
+    def test_codex_reports_no_pid_because_its_hooks_run_in_the_shared_daemon(self):
+        self.assertIsNone(hook.agent_pid(hook.PROCESSES["codex"]))
 
 
 if __name__ == "__main__":

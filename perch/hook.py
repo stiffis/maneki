@@ -55,8 +55,9 @@ EVENTS = {
     "errorOccurred": "StopFailure",
 }
 TOOL_EVENTS = ("PreToolUse", "PostToolUse", "PostToolUseFailure")
-PROCESSES = {"claude": ("claude",), "codex": ("codex",), "copilot": ("copilot",)}
+PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",)}
 ANSWERING_AGENTS = ("claude", "codex")
+WAIT_LIMITS = {"codex": 60}
 EMPTY_JSON_EVENTS = {"codex": ("Stop", "SubagentStop", "Interrupt")}
 LIMITS = {"prompt": 300, "message": 300, "title": 120, "last_assistant_message": 400, "error": 300}
 STRING_LIMIT = 4000
@@ -118,6 +119,8 @@ def launcher_names(proc, pid):
 
 
 def agent_pid(names=("claude",), start=None, proc="/proc", depth=8):
+    if not names:
+        return None
     pid = start or os.getppid()
     for _ in range(depth):
         try:
@@ -155,14 +158,14 @@ def wants_answer(event):
     )
 
 
-def ask(event):
+def ask(event, limit=None):
     sock = proto.connect()
     if sock is None:
         return None
     with sock:
         try:
             sock.sendall(proto.encode({"type": "ask", "event": event}))
-            sock.settimeout(None)
+            sock.settimeout(limit)
             reply = proto.read_message(sock)
         except OSError:
             return None
@@ -188,7 +191,7 @@ def run(stdin, stdout, agent="claude", event_name=None):
     event = reduce(payload, time.time(), agent_pid(PROCESSES.get(agent, (agent,))), agent)
     output = None
     if wants_answer(event):
-        answer = ask(event)
+        answer = ask(event, WAIT_LIMITS.get(agent))
         output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")))
     else:
         proto.send({"type": "event", "event": event})
