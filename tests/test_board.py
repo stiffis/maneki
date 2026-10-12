@@ -259,5 +259,19 @@ class SilentSessionTest(unittest.TestCase):
         self.assertEqual(board.sessions["s1"].status, WORKING)
 
 
+class SharedServerTest(unittest.TestCase):
+    def test_a_dead_opencode_server_drops_its_session(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="opencode", pid=55))
+        board.expire(2, lambda pid: pid != 55)
+        self.assertEqual(board.sessions, {})
+
+    def test_a_live_opencode_service_still_settles_silent_sessions(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="opencode", pid=55))
+        board.expire(1 + 15 * 60 + 1, lambda pid: True)
+        self.assertEqual(board.sessions["s1"].status, IDLE)
+
+
 if __name__ == "__main__":
     unittest.main()

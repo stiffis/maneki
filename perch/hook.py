@@ -55,7 +55,7 @@ EVENTS = {
     "errorOccurred": "StopFailure",
 }
 TOOL_EVENTS = ("PreToolUse", "PostToolUse", "PostToolUseFailure")
-PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",), "opencode": ()}
+PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",), "opencode": ("opencode",)}
 ANSWERING_AGENTS = ("claude", "codex", "copilot", "opencode")
 WAIT_LIMITS = {"codex": 60, "copilot": 60, "opencode": 60}
 EMPTY_JSON_EVENTS = {"codex": ("Stop", "SubagentStop", "Interrupt")}

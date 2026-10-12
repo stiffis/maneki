@@ -22,6 +22,7 @@ RECENT_LIMIT = 24
 STALE_SECONDS = 12 * 3600
 IDLE_WITHOUT_PID_SECONDS = 30 * 60
 SILENT_WITHOUT_PID_SECONDS = 15 * 60
+SHARED_SERVERS = frozenset({"codex", "opencode"})
 
 
 @dataclass
@@ -334,12 +335,13 @@ class Board:
         resolved = []
         for session in list(self.sessions.values()):
             dead = session.pid is not None and not alive(session.pid)
-            forgotten = session.pid is None and session.status == IDLE and now - session.seen > IDLE_WITHOUT_PID_SECONDS
+            shared = session.pid is None or session.agent in SHARED_SERVERS
+            forgotten = shared and session.status == IDLE and now - session.seen > IDLE_WITHOUT_PID_SECONDS
             if dead or forgotten or now - session.seen > self.stale_seconds:
                 resolved += self.drop(session.id)
                 changed = True
                 continue
-            if session.pid is None and session.status in BUSY and not self.asks_of(session.id):
+            if shared and session.status in BUSY and not self.asks_of(session.id):
                 if now - session.seen > SILENT_WITHOUT_PID_SECONDS:
                     self.set_status(session, IDLE, now, "No news for a while")
                     session.turn_end = session.seen

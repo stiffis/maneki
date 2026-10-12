@@ -183,9 +183,9 @@ class WaitLimitTest(unittest.TestCase):
 
 
 class CodexPidTest(unittest.TestCase):
-    def test_shared_servers_report_no_pid(self):
-        for agent in ("codex", "opencode"):
-            self.assertIsNone(hook.agent_pid(hook.PROCESSES[agent]), agent)
+    def test_codex_reports_no_pid_and_opencode_reports_its_server(self):
+        self.assertIsNone(hook.agent_pid(hook.PROCESSES["codex"]))
+        self.assertEqual(hook.PROCESSES["opencode"], ("opencode",))
 
     def test_agents_that_wait_for_the_hook_have_a_limit(self):
         self.assertEqual(hook.WAIT_LIMITS, {"codex": 60, "copilot": 60, "opencode": 60})
