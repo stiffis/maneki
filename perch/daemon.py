@@ -16,7 +16,7 @@ gi.require_version("Gtk4LayerShell", "1.0")
 from gi.repository import Gdk, Gio, GLib, Gtk, Pango  # noqa: E402
 from gi.repository import Gtk4LayerShell as LayerShell  # noqa: E402
 
-from . import describe, hypr, transcript, trust  # noqa: E402
+from . import config, describe, hypr, mascots, transcript, trust  # noqa: E402
 from .hook import WAIT_LIMITS  # noqa: E402
 from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
@@ -40,6 +40,10 @@ DETAIL_CHARS = 46
 TOP_MARGIN = 6
 ICON_SIZE = 14
 HINT = "Super+Alt+Y allow · Super+Alt+N deny"
+FRAME_MS = 280
+FEELING_SECONDS = 3.2
+BLINK_EVERY_MS = 4200
+BLINK_MS = 160
 
 
 def pid_alive(pid):
@@ -60,6 +64,117 @@ def label(text, *classes, wrap=False, width=None, lines=None):
     if width or lines:
         widget.set_ellipsize(Pango.EllipsizeMode.END)
     return widget
+
+
+def detach(widget):
+    parent = widget.get_parent()
+    if isinstance(parent, Gtk.Overlay):
+        parent.remove_overlay(widget)
+    elif parent is not None:
+        parent.remove(widget)
+
+
+class Mascot:
+    def __init__(self, name, scale, ended):
+        sprite = mascots.SPRITES[name]
+        self.name = name
+        self.scale = scale
+        self.ended = ended
+        self.area = Gtk.DrawingArea()
+        self.area.add_css_class("mascot")
+        self.area.set_content_width(sprite.width * scale)
+        self.area.set_content_height((sprite.height + mascots.LIFT) * scale)
+        self.area.set_valign(Gtk.Align.START)
+        self.area.set_draw_func(self.draw)
+        self.bubble = Gtk.Label()
+        self.bubble.add_css_class("bubble")
+        self.bubble.set_halign(Gtk.Align.END)
+        self.bubble.set_valign(Gtk.Align.START)
+        self.bubble.set_can_target(False)
+        self.state = mascots.IDLE
+        self.feeling = None
+        self.since = time.monotonic()
+        self.frame = 0
+        self.blinking = False
+        self.animation = None
+        self.blinker = None
+        self.pose = None
+        self.refresh()
+
+    def set_state(self, state):
+        if state != self.state:
+            self.state = state
+            if self.feeling is None:
+                self.restart()
+
+    def feel(self, feeling):
+        self.feeling = feeling
+        self.restart()
+
+    def restart(self):
+        self.since = time.monotonic()
+        self.frame = 0
+        if self.animation is None:
+            self.animation = GLib.timeout_add(FRAME_MS, self.step)
+        self.refresh()
+
+    def step(self):
+        self.frame += 1
+        if time.monotonic() - self.since < FEELING_SECONDS:
+            self.refresh()
+            return GLib.SOURCE_CONTINUE
+        self.animation = None
+        if self.feeling is not None:
+            self.feeling = None
+            self.ended()
+        self.refresh()
+        return GLib.SOURCE_REMOVE
+
+    def refresh(self):
+        moving = self.animation is not None
+        age = time.monotonic() - self.since if moving else FEELING_SECONDS
+        self.pose = mascots.pose(self.name, self.feeling or self.state, self.frame, age, not moving, self.blinking)
+        text = self.pose.bubble if moving else ""
+        if self.bubble.get_label() != text:
+            self.bubble.set_label(text)
+        self.bubble.set_visible(bool(text))
+        self.area.queue_draw()
+
+    def draw(self, area, cr, width, height):
+        size = self.scale
+        lift = mascots.LIFT - min(self.pose.dy, mascots.LIFT)
+        for color, cells in mascots.pixels(self.name, self.pose.parts, self.pose.drop):
+            cr.set_source_rgb(*color)
+            for x, y in cells:
+                cr.rectangle(x * size, (y + lift) * size, size, size)
+            cr.fill()
+
+    def wake(self):
+        if self.blinker is None:
+            self.blinker = GLib.timeout_add(BLINK_EVERY_MS, self.blink)
+
+    def sleep(self):
+        if self.animation is None and self.blinker is None and self.feeling is None and not self.blinking:
+            return
+        for source in (self.animation, self.blinker):
+            if source is not None:
+                GLib.source_remove(source)
+        self.animation = self.blinker = None
+        self.feeling = None
+        self.blinking = False
+        self.refresh()
+
+    def blink(self):
+        if self.animation is None and self.state != mascots.IDLE:
+            self.blinking = True
+            self.refresh()
+            GLib.timeout_add(BLINK_MS, self.unblink)
+        return GLib.SOURCE_CONTINUE
+
+    def unblink(self):
+        self.blinking = False
+        self.refresh()
+        return GLib.SOURCE_REMOVE
 
 
 class Island:
@@ -90,6 +205,9 @@ class Island:
         self.monitor = None
         self.server = None
         self.provider = Gtk.CssProvider()
+        self.settings = config.load()
+        self.mascot = None
+        self.moods = {}
 
     def start(self):
         self.server = Server(socket_path(), self.on_message, self.on_close)
@@ -111,6 +229,7 @@ class Island:
         )
         self.load_css()
         self.watch_css()
+        self.mascot = self.make_mascot()
         GLib.timeout_add(1000, self.tick)
         self.refresh_desktop()
         try:
@@ -156,7 +275,35 @@ class Island:
     def css_changed(self, *args):
         if not self.reload_queued:
             self.reload_queued = True
-            GLib.timeout_add(150, self.load_css)
+            GLib.timeout_add(150, self.reload_files)
+
+    def reload_files(self):
+        self.load_css()
+        settings = config.load()
+        if settings != self.settings:
+            self.settings = settings
+            if self.mascot:
+                self.mascot.sleep()
+            self.mascot = self.make_mascot()
+            self.queue_render()
+        return GLib.SOURCE_REMOVE
+
+    def make_mascot(self):
+        name = self.settings["mascot"]
+        if name not in mascots.SPRITES:
+            return None
+        return Mascot(name, self.settings["mascot_scale"], self.queue_render)
+
+    def update_mascot(self, asks):
+        current = {session.id: (session.status, session.activity) for session in self.board.sessions.values()}
+        feeling = mascots.emotion(self.moods, current)
+        self.moods = current
+        if self.mascot is None:
+            return False
+        if feeling:
+            self.mascot.feel(feeling)
+        self.mascot.set_state(mascots.mood([status for status, _ in current.values()], bool(asks)))
+        return self.mascot.feeling is not None
 
     def on_message(self, connection, message):
         kind = message.get("type")
@@ -206,7 +353,7 @@ class Island:
             self.show_notice("Do not disturb: on" if self.dnd else "Do not disturb: off")
             return {"ok": True, "dnd": self.dnd}
         if name == "status":
-            desktop = {"dnd": self.dnd, "fullscreen": self.fullscreen, "monitor": self.monitor_name}
+            desktop = {"dnd": self.dnd, "fullscreen": self.fullscreen, "monitor": self.monitor_name, "mascot": self.settings["mascot"]}
             return {"ok": True, **desktop, **self.board.snapshot()}
         if name == "quit":
             GLib.idle_add(self.app.quit)
@@ -373,35 +520,63 @@ class Island:
         sessions = [] if quiet else self.board.visible(self.expanded)
         asks = self.board.ordered_asks()
         notice = self.notice[0] if self.notice and time.monotonic() < self.notice[1] else None
-        if not sessions and not asks and not notice:
+        feeling = self.update_mascot(asks)
+        mascot = self.mascot if self.mascot and (sessions or asks or feeling) else None
+        if self.mascot and not mascot:
+            self.mascot.sleep()
+        if not sessions and not asks and not notice and not mascot:
             self.window.set_visible(False)
             self.window.set_child(None)
             return GLib.SOURCE_REMOVE
-        self.set_layer(bool(asks))
+        alone = not sessions and not asks and not notice
+        self.set_layer(bool(asks) or alone)
         names = self.board.names()
-        island = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-        island.add_css_class("island")
-        if asks:
-            island.add_css_class("asking")
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         for index, ask in enumerate(asks[:MAX_ASKS]):
-            island.append(self.ask_card(ask, names, index == 0))
+            content.append(self.ask_card(ask, names, index == 0))
         if len(asks) > MAX_ASKS:
-            island.append(label(f"+{len(asks) - MAX_ASKS} more waiting", "hint"))
+            content.append(label(f"+{len(asks) - MAX_ASKS} more waiting", "hint"))
         if notice:
-            island.append(label(notice, "notice"))
+            content.append(label(notice, "notice"))
         for session in sessions:
-            island.append(self.session_row(session, names, now))
+            content.append(self.session_row(session, names, now))
             agents = list(session.agents.values())
             for agent in agents[-MAX_AGENTS:]:
-                island.append(self.agent_row(agent, now))
+                content.append(self.agent_row(agent, now))
             if len(agents) > MAX_AGENTS:
-                island.append(label(f"+{len(agents) - MAX_AGENTS} more agents", "hint", "agent-more"))
+                content.append(label(f"+{len(agents) - MAX_AGENTS} more agents", "hint", "agent-more"))
             if self.expanded or session.id in self.opened:
-                island.append(self.session_details(session))
-        self.window.set_child(island)
+                content.append(self.session_details(session))
+        self.window.set_child(self.wrap(content, mascot, bool(asks), alone))
         self.window.set_default_size(1, 1)
         self.window.set_visible(True)
         return GLib.SOURCE_REMOVE
+
+    def wrap(self, content, mascot, asking, alone):
+        island = Gtk.Box(spacing=10)
+        island.add_css_class("island")
+        if asking:
+            island.add_css_class("asking")
+        if mascot is None:
+            content.set_hexpand(True)
+            island.append(content)
+            return island
+        mascot.wake()
+        detach(mascot.area)
+        detach(mascot.bubble)
+        island.append(mascot.area)
+        if alone:
+            island.add_css_class("alone")
+            mascot.bubble.set_valign(Gtk.Align.CENTER)
+            island.append(mascot.bubble)
+            return island
+        content.set_hexpand(True)
+        island.append(content)
+        mascot.bubble.set_valign(Gtk.Align.START)
+        overlay = Gtk.Overlay()
+        overlay.set_child(island)
+        overlay.add_overlay(mascot.bubble)
+        return overlay
 
     def ask_card(self, ask, names, first):
         card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
