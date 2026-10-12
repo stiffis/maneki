@@ -55,6 +55,14 @@ class ClaudePidTest(unittest.TestCase):
             self.fake_proc(root, [(30, "we (ird) name", 10), (10, "claude", 1)])
             self.assertEqual(hook.agent_pid(("claude",), 30, root), 10)
 
+    def test_returns_none_for_non_utf8_stat(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            directory = root / "30"
+            directory.mkdir()
+            (directory / "stat").write_bytes(b"30 (claude\xff) S 1 1 1 0\n")
+            self.assertIsNone(hook.agent_pid(("claude",), 30, root))
+
     def test_returns_none_without_claude(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

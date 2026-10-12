@@ -128,7 +128,7 @@ def agent_pid(names=("claude",), start=None, proc="/proc", depth=8):
         try:
             with open(os.path.join(proc, str(pid), "stat")) as stat:
                 comm, ppid = parse_stat(stat.read())
-        except (OSError, ValueError, IndexError):
+        except (OSError, UnicodeDecodeError, ValueError, IndexError):
             return None
         if comm in names or launcher_names(proc, pid) & set(names):
             return pid
