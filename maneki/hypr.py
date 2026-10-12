@@ -2,8 +2,6 @@ import json
 import os
 import socket
 
-from gi.repository import GLib
-
 FULLSCREEN = 2
 WATCHED = frozenset(
     {
@@ -91,6 +89,8 @@ class Events:
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.connect(os.path.join(base, ".socket2.sock"))
         self.sock.setblocking(False)
+        from gi.repository import GLib
+
         self.watch = GLib.io_add_watch(
             self.sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self.readable
         )
