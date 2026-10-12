@@ -89,8 +89,9 @@ maximized), the island stays quiet the same way, and permission requests
 still show on top. The island follows the focused monitor, so it moves to an
 external screen when you work there.
 
-Click a session to see its recent steps. `maneki status` prints the state as
-JSON and `maneki quit` stops the island.
+Click a session to see its recent steps and the agent's last message, with
+its markdown (bold, lists, code, quotes) rendered. `maneki status` prints the
+state as JSON and `maneki quit` stops the island.
 
 ## Mascot
 
