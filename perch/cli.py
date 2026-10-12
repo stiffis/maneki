@@ -8,6 +8,7 @@ COMMANDS = {
     "allow": "allow the oldest pending permission request",
     "deny": "deny the oldest pending permission request",
     "always": "allow it and remember the rule Claude Code suggested",
+    "terminal": "leave the oldest request to the agent's own prompt",
     "toggle": "show or hide idle sessions and recent steps",
     "status": "print the island state as JSON",
     "quit": "stop the island",

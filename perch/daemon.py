@@ -21,7 +21,7 @@ from .board import DONE, Board  # noqa: E402
 from .paths import ICONS, THEMES, config_dir, socket_path  # noqa: E402
 from .server import AlreadyRunning, Server  # noqa: E402
 
-ANSWERS = ("allow", "deny", "always")
+ANSWERS = ("allow", "deny", "always", "terminal")
 STATUS_SYMBOL = {"working": "●", "asking": "●", "attention": "●", "done": "✓", "idle": "○"}
 STEP_SYMBOL = {"running": "…", "ok": "✓", "error": "✗"}
 AGENT_SYMBOL = {"running": "↳", "ok": "✓", "error": "✗"}
@@ -164,7 +164,7 @@ class Island:
             ask = self.board.oldest_ask()
             if ask is None:
                 return {"ok": False, "error": "nothing is waiting for an answer"}
-            self.answer(ask.id, name)
+            self.answer(ask.id, None if name == "terminal" else name)
             return {"ok": True, "tool": ask.tool}
         if name == "toggle":
             self.expanded = not self.expanded
