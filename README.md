@@ -24,6 +24,10 @@ Claude Code ──hook (JSON on stdin)──▶ perch hook ──unix socket─�
   shows that the session needs you.
 - A session leaves the island on `SessionEnd`, when its `claude` process exits,
   or after an interrupt settles it.
+- Each session shows how long the current turn has run (or how long the last
+  one took), and each subagent gets its own row with its steps, what it is
+  doing and its time. Claude Code does not report real progress, so steps are
+  the measure.
 
 ## Requirements
 
@@ -56,10 +60,12 @@ JSON and `perch quit` stops the island.
 
 ## Theming
 
-The island reads `~/.config/perch/colors.css` and `style.css` and reloads them
-when they change. `colors.css` is a copy of one of the four variants
-(everforest, gruvbox, dark and light); `~/theme-switcher/perch/set-theme.sh`
-swaps it with the rest of the desktop.
+The island loads `~/.config/perch/colors.css`, then the base `themes/style.css`
+from this repo, then `~/.config/perch/style.css`, which starts empty and holds
+your own overrides. It reloads them when a file in `~/.config/perch` changes.
+`colors.css` is a copy of one of the four variants (everforest, gruvbox, dark
+and light); `~/theme-switcher/perch/set-theme.sh` swaps it with the rest of the
+desktop.
 
 ## Uninstall
 
