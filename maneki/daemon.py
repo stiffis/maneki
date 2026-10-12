@@ -98,10 +98,12 @@ class Mascot:
         self.area.set_content_height((sprite.height + mascots.LIFT) * scale)
         self.area.set_valign(Gtk.Align.START)
         self.area.set_draw_func(self.draw)
-        self.bubble = Gtk.Label()
-        self.bubble.add_css_class("bubble")
+        self.bubble = Gtk.Stack()
         self.bubble.set_valign(Gtk.Align.START)
         self.bubble.set_can_target(False)
+        self.bubble.add_named(Gtk.Box(), "")
+        for text in mascots.bubbles(name):
+            self.add_bubble(text)
         self.state = mascots.IDLE
         self.feeling = None
         self.since = time.monotonic()
@@ -146,10 +148,17 @@ class Mascot:
         age = time.monotonic() - self.since if moving else FEELING_SECONDS
         self.pose = mascots.pose(self.name, self.feeling or self.state, self.frame, age, not moving, self.blinking)
         text = self.pose.bubble if moving else ""
-        if self.bubble.get_label() != text:
-            self.bubble.set_label(text)
-        self.bubble.set_visible(bool(text))
+        if self.bubble.get_child_by_name(text) is None:
+            self.add_bubble(text)
+        self.bubble.set_visible_child_name(text)
         self.area.queue_draw()
+
+    def add_bubble(self, text):
+        line = Gtk.Label(label=text)
+        line.add_css_class("bubble")
+        line.set_halign(Gtk.Align.END)
+        line.set_valign(Gtk.Align.START)
+        self.bubble.add_named(line, text)
 
     def draw(self, area, cr, width, height):
         size = self.scale
