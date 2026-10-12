@@ -46,7 +46,7 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(self.board.sessions, {})
 
     def test_dead_claude_process_drops_the_session(self):
-        self.board.apply(event("UserPromptSubmit", 1, claude_pid=4242))
+        self.board.apply(event("UserPromptSubmit", 1, pid=4242))
         changed, _ = self.board.expire(2, lambda pid: pid != 4242)
         self.assertTrue(changed)
         self.assertEqual(self.board.sessions, {})
@@ -57,9 +57,17 @@ class FlowTest(unittest.TestCase):
         self.assertEqual(self.board.sessions["s1"].status, IDLE)
 
     def test_duplicate_project_names_get_a_suffix(self):
-        self.board.apply(event("UserPromptSubmit", 1, session="aaaa1111"))
-        self.board.apply(event("UserPromptSubmit", 1, session="bbbb2222"))
-        self.assertEqual(sorted(self.board.names().values()), ["proj #aaaa", "proj #bbbb"])
+        self.board.apply(event("UserPromptSubmit", 1, session="ses_01hAAAA"))
+        self.board.apply(event("UserPromptSubmit", 1, session="ses_01hBBBB"))
+        self.assertEqual(sorted(self.board.names().values()), ["proj #AAAA", "proj #BBBB"])
+
+    def test_questions_need_you_until_answered(self):
+        self.board.apply(event("UserPromptSubmit", 1, agent="opencode"))
+        self.board.apply(event("PreToolUse", 2, agent="opencode", tool_name="question", tool_input={}, tool_use_id="q1"))
+        session = self.board.sessions["s1"]
+        self.assertEqual((session.status, session.activity), ("attention", "Has a question for you"))
+        self.board.apply(event("PostToolUse", 3, agent="opencode", tool_name="question", tool_input={}, tool_use_id="q1"))
+        self.assertEqual((session.status, session.activity), (WORKING, "Thinking…"))
 
 
 class AskTest(unittest.TestCase):
@@ -188,6 +196,33 @@ class AgentTest(unittest.TestCase):
     def test_interrupt_fails_running_agents(self):
         self.board.interrupted("s1", 7, 8)
         self.assertEqual(self.session.agents["ag1"].state, "error")
+
+
+class MultiAgentTest(unittest.TestCase):
+    def test_codex_interrupt_settles_the_session(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="codex"))
+        board.apply(event("Interrupt", 5, agent="codex"))
+        session = board.sessions["s1"]
+        self.assertEqual((session.agent, session.status, session.activity), ("codex", IDLE, "Interrupted"))
+
+    def test_only_claude_transcripts_are_followed(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="codex", transcript_path="/t/codex.jsonl"))
+        board.apply(event("UserPromptSubmit", 1, session="s2", transcript_path="/t/claude.jsonl"))
+        self.assertEqual([s.id for s in board.watched()], ["s2"])
+
+    def test_opencode_permission_resolved_in_its_own_ui(self):
+        board = Board()
+        ask = board.add_ask(event("PermissionRequest", 2, agent="opencode", tool_name="bash", tool_input={"command": "ls"}, tool_use_id="per_1"))
+        self.assertEqual(ask.tool_use_id, "per_1")
+        self.assertEqual(board.apply(event("PermissionResolved", 3, agent="opencode", tool_use_id="per_1")), [ask.id])
+
+    def test_opencode_task_tool_launches_an_agent(self):
+        board = Board()
+        board.apply(event("PreToolUse", 1, agent="opencode", tool_name="task", tool_input={"description": "Scan", "subagent_type": "general"}, tool_use_id="c1"))
+        board.apply(event("SubagentStart", 2, agent="opencode", agent_id="child", agent_type="general"))
+        self.assertEqual(board.sessions["s1"].agents["child"].label, "Scan")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,6 @@ BUSY = (ASKING, ATTENTION, WORKING)
 PRIORITY = {ASKING: 0, ATTENTION: 1, WORKING: 2, DONE: 3, IDLE: 4}
 ATTENTION_NOTIFICATIONS = {"elicitation_dialog", "elicitation_url_dialog", "agent_needs_input"}
 PASS_THROUGH_LABELS = {"AskUserQuestion": "Has a question for you", "ExitPlanMode": "Plan ready for review"}
-AGENT_TOOLS = ("Agent", "Task")
 DEFAULT_AGENT = "general-purpose"
 STEP_LIMIT = 12
 RECENT_LIMIT = 24
@@ -48,6 +47,7 @@ class Agent:
 @dataclass
 class Session:
     id: str
+    agent: str = "claude"
     cwd: str = ""
     title: str = ""
     pid: int | None = None
@@ -110,7 +110,8 @@ class Board:
             session = self.sessions[session_id] = Session(session_id, turn_ts=ts)
         session.cwd = event.get("cwd") or session.cwd
         session.title = event.get("session_title") or session.title
-        session.pid = event.get("claude_pid") or session.pid
+        session.agent = event.get("agent") or session.agent
+        session.pid = event.get("pid") or session.pid
         session.transcript = event.get("transcript_path") or session.transcript
         session.seen = max(session.seen, ts)
         return session
@@ -153,6 +154,10 @@ class Board:
             self.agent_started(session, event, ts)
         elif name == "SubagentStop":
             self.agent_stopped(session, event, ts)
+        elif name == "Interrupt":
+            return self.interrupted(session.id, ts, ts)
+        elif name == "PermissionResolved":
+            return self.result_seen(session.id, key)
         elif name == "PermissionRequest":
             self.set_status(session, ATTENTION, ts, PASS_THROUGH_LABELS.get(tool, "Waiting for permission"))
         elif name == "Notification":
@@ -186,10 +191,14 @@ class Board:
             return
         if key and session.step(key) is None:
             session.steps.append(Step(key, label))
-        if tool in AGENT_TOOLS:
+        if describe.canonical(tool) == "Agent":
             kind = data.get("subagent_type") or DEFAULT_AGENT
             session.launches.append((kind, describe.first_line(data.get("description"), 50)))
-        if not self.asks_of(session.id):
+        if self.asks_of(session.id):
+            return
+        if describe.canonical(tool) == "AskUserQuestion":
+            self.set_status(session, ATTENTION, ts, label)
+        else:
             self.set_status(session, WORKING, ts, label)
 
     def tool_finished(self, session, event, key, tool, data, ts, ok):
@@ -206,7 +215,7 @@ class Board:
             session.steps.append(step)
         if step:
             step.state = "ok" if ok else "error"
-        if session.status == WORKING:
+        if session.status in (WORKING, ATTENTION) and not self.asks_of(session.id):
             self.set_status(session, WORKING, ts, describe.THINKING)
         return resolved
 
@@ -249,7 +258,9 @@ class Board:
         return [
             session
             for session in self.sessions.values()
-            if session.transcript and (session.status in BUSY or self.asks_of(session.id))
+            if session.agent == "claude"
+            and session.transcript
+            and (session.status in BUSY or self.asks_of(session.id))
         ]
 
     def result_seen(self, session_id, tool_use_id):
@@ -275,7 +286,7 @@ class Board:
         data = event.get("tool_input") or {}
         ts = event.get("ts") or time.time()
         taken = {ask.tool_use_id for ask in self.asks.values()}
-        key = next(
+        key = event.get("tool_use_id") or next(
             (k for k, t, d in reversed(session.recent) if t == tool and d == data and k not in taken),
             None,
         )
@@ -343,7 +354,7 @@ class Board:
     def names(self):
         counts = Counter(session.name for session in self.sessions.values())
         return {
-            session.id: session.name if counts[session.name] == 1 else f"{session.name} #{session.id[:4]}"
+            session.id: session.name if counts[session.name] == 1 else f"{session.name} #{session.id[-4:]}"
             for session in self.sessions.values()
         }
 
@@ -354,6 +365,7 @@ class Board:
             "sessions": [
                 {
                     "id": s.id,
+                    "agent": s.agent,
                     "name": names[s.id],
                     "cwd": s.cwd,
                     "status": s.status,
