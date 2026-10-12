@@ -34,6 +34,7 @@ CAMEL = {
     "transcriptPath": "transcript_path",
     "toolName": "tool_name",
     "toolArgs": "tool_input",
+    "toolInput": "tool_input",
     "agentId": "agent_id",
     "agentType": "agent_type",
     "agentName": "agent_type",
@@ -56,8 +57,8 @@ EVENTS = {
 }
 TOOL_EVENTS = ("PreToolUse", "PostToolUse", "PostToolUseFailure")
 PROCESSES = {"claude": ("claude",), "codex": (), "copilot": ("copilot",)}
-ANSWERING_AGENTS = ("claude", "codex")
-WAIT_LIMITS = {"codex": 60}
+ANSWERING_AGENTS = ("claude", "codex", "copilot")
+WAIT_LIMITS = {"codex": 60, "copilot": 60}
 EMPTY_JSON_EVENTS = {"codex": ("Stop", "SubagentStop", "Interrupt")}
 LIMITS = {"prompt": 300, "message": 300, "title": 120, "last_assistant_message": 400, "error": 300}
 STRING_LIMIT = 4000
@@ -136,7 +137,7 @@ def agent_pid(names=("claude",), start=None, proc="/proc", depth=8):
     return None
 
 
-def decision_output(answer, suggestion):
+def decision_output(answer, suggestion, agent="claude"):
     if answer == "allow":
         decision = {"behavior": "allow"}
     elif answer == "always":
@@ -147,7 +148,10 @@ def decision_output(answer, suggestion):
         decision = {"behavior": "deny", "message": DENY_MESSAGE}
     else:
         return None
-    return {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": decision}}
+    output = {"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": decision}}
+    if agent == "copilot":
+        output.update({key: value for key, value in decision.items() if key in ("behavior", "message")})
+    return output
 
 
 def wants_answer(event):
@@ -192,7 +196,7 @@ def run(stdin, stdout, agent="claude", event_name=None):
     output = None
     if wants_answer(event):
         answer = ask(event, WAIT_LIMITS.get(agent))
-        output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")))
+        output = decision_output(answer, describe.pick_suggestion(event.get("permission_suggestions")), agent)
     else:
         proto.send({"type": "event", "event": event})
     if output is None and event["hook_event_name"] in EMPTY_JSON_EVENTS.get(agent, ()):

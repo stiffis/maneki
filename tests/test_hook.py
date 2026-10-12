@@ -119,11 +119,18 @@ class AgentPayloadTest(unittest.TestCase):
         event = hook.normalize({"tool_name": "Bash", "tool_input": {}}, "PermissionRequest")
         self.assertNotIn("tool_use_id", event)
 
-    def test_copilot_never_waits_for_the_island(self):
-        event = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, "copilot")
-        self.assertFalse(hook.wants_answer(event))
-        codex = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, "codex")
-        self.assertTrue(hook.wants_answer(codex))
+    def test_answering_agents_wait_and_others_do_not(self):
+        for agent in ("claude", "codex", "copilot"):
+            event = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, agent)
+            self.assertTrue(hook.wants_answer(event), agent)
+        other = hook.reduce({"hook_event_name": "PermissionRequest", "tool_name": "Bash"}, 0, None, "opencode")
+        self.assertFalse(hook.wants_answer(other))
+
+    def test_copilot_gets_its_documented_top_level_decision(self):
+        output = hook.decision_output("deny", None, "copilot")
+        self.assertEqual((output["behavior"], output["message"]), ("deny", hook.DENY_MESSAGE))
+        self.assertEqual(output["hookSpecificOutput"]["decision"]["behavior"], "deny")
+        self.assertNotIn("behavior", hook.decision_output("allow", None, "claude"))
 
     def test_options(self):
         self.assertEqual(hook.options(["--agent", "copilot", "--event", "Stop"]), ("copilot", "Stop"))
