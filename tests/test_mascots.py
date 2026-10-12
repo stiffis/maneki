@@ -45,6 +45,14 @@ class SpriteTest(unittest.TestCase):
         rows = {y for _, found in mascots.pixels("osaka", pose.parts, pose.drop) for _, y in found}
         self.assertNotIn(0, rows)
 
+    def test_every_bubble_is_known_ahead(self):
+        for sprite in SPRITES.values():
+            known = set(mascots.bubbles(sprite.name))
+            self.assertNotIn("", known)
+            for _, pose in poses(sprite):
+                self.assertTrue(pose.bubble == "" or pose.bubble in known, pose.bubble)
+        self.assertIn("sata andagi!", mascots.bubbles("osaka"))
+
     def test_osaka_notices_a_request_late(self):
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 0.5, False, False).bubble, "…")
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 2.0, False, False).bubble, "huh?!")

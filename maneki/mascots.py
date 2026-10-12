@@ -297,3 +297,16 @@ def emotion(before, after):
         elif activity == "Interrupted" and old[1] != "Interrupted" and found is None:
             found = INTERRUPTED
     return found
+
+
+def bubbles(name):
+    frame = SPRITES[name].frame
+    found = {
+        frame(state, step, age, rest, blink).bubble
+        for state in STATES
+        for step in range(CYCLE)
+        for age in (0.0, SLOW_SECONDS, STARTLED_SECONDS, 9.0)
+        for rest in (False, True)
+        for blink in (False, True)
+    }
+    return sorted(found - {""})
