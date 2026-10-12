@@ -5,11 +5,15 @@ window.perch {
 .island {
     background-color: var(--bg);
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 14px;
+    border: 2px solid var(--border);
+    border-radius: 0;
     padding: 6px 12px;
     min-width: 280px;
     font-size: 13px;
+}
+
+.island.asking {
+    border-color: var(--asking);
 }
 
 .session {
@@ -81,8 +85,7 @@ window.perch {
 
 .ask {
     background-color: var(--surface);
-    border: 1px solid var(--asking);
-    border-radius: 10px;
+    border-radius: 0;
     padding: 8px 10px;
     margin: 4px 0 2px 0;
 }
@@ -94,7 +97,7 @@ window.perch {
 .ask-detail {
     font-family: monospace;
     background-color: var(--bg);
-    border-radius: 6px;
+    border-radius: 0;
     padding: 6px 8px;
 }
 
@@ -103,7 +106,7 @@ window.perch {
     background-color: var(--surface);
     box-shadow: none;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 0;
     min-height: 24px;
     padding: 2px 10px;
     color: var(--text);
@@ -134,4 +137,5 @@ tooltip {
     background-color: var(--bg);
     color: var(--text);
     border: 1px solid var(--border);
+    border-radius: 0;
 }

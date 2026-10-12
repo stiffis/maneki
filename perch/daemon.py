@@ -227,6 +227,8 @@ class Island:
         names = self.board.names()
         island = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         island.add_css_class("island")
+        if asks:
+            island.add_css_class("asking")
         for index, ask in enumerate(asks[:MAX_ASKS]):
             island.append(self.ask_card(ask, names, index == 0))
         if len(asks) > MAX_ASKS:
