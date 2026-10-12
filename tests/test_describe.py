@@ -60,5 +60,15 @@ class SuggestionTest(unittest.TestCase):
         self.assertEqual(describe.always_label(None), "")
 
 
+class DurationTest(unittest.TestCase):
+    def test_formats(self):
+        self.assertEqual(describe.duration(None), "")
+        self.assertEqual(describe.duration(-3), "0s")
+        self.assertEqual(describe.duration(42.9), "42s")
+        self.assertEqual(describe.duration(60), "1m")
+        self.assertEqual(describe.duration(3599), "59m")
+        self.assertEqual(describe.duration(3600 + 5 * 60 + 9), "1h 5m")
+
+
 if __name__ == "__main__":
     unittest.main()

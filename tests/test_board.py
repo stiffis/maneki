@@ -119,5 +119,76 @@ class InterruptTest(unittest.TestCase):
         self.assertEqual(self.board.sessions["s1"].status, WORKING)
 
 
+class ElapsedTest(unittest.TestCase):
+    def test_counts_while_busy_and_freezes_when_done(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 100))
+        session = board.sessions["s1"]
+        self.assertEqual(session.elapsed(160), 60)
+        board.apply(event("Stop", 280))
+        self.assertEqual(session.elapsed(999), 180)
+        board.apply(event("UserPromptSubmit", 1000))
+        self.assertEqual(session.elapsed(1005), 5)
+
+    def test_interrupt_freezes_the_clock(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 100))
+        board.interrupted("s1", 130, 131)
+        self.assertEqual(board.sessions["s1"].elapsed(500), 31)
+
+
+EXPLORE = {"description": "Map the theme files", "prompt": "...", "subagent_type": "Explore"}
+
+
+class AgentTest(unittest.TestCase):
+    def setUp(self):
+        self.board = Board(done_seconds=10)
+        self.board.apply(event("UserPromptSubmit", 1))
+        self.board.apply(event("PreToolUse", 2, tool_name="Agent", tool_input=EXPLORE, tool_use_id="a1"))
+        self.board.apply(event("SubagentStart", 3, agent_id="ag1", agent_type="Explore"))
+        self.session = self.board.sessions["s1"]
+
+    def test_agent_takes_the_launch_description(self):
+        agent = self.session.agents["ag1"]
+        self.assertEqual((agent.kind, agent.label, agent.state), ("Explore", "Map the theme files", "running"))
+
+    def test_agent_tools_count_as_agent_steps_not_session_steps(self):
+        read = {"file_path": "/x/style.css"}
+        self.board.apply(event("PreToolUse", 4, tool_name="Read", tool_input=read, tool_use_id="r1", agent_id="ag1", agent_type="Explore"))
+        self.board.apply(event("PostToolUse", 5, tool_name="Read", tool_input=read, tool_use_id="r1", agent_id="ag1", agent_type="Explore"))
+        agent = self.session.agents["ag1"]
+        self.assertEqual((agent.steps, agent.activity), (1, "Reading style.css"))
+        self.assertEqual([step.key for step in self.session.steps], ["a1"])
+        self.assertEqual(self.session.activity, "Agent: Map the theme files")
+
+    def test_stop_finishes_the_agent_and_expire_clears_it(self):
+        self.board.apply(event("SubagentStop", 9, agent_id="ag1", agent_type="Explore", last_assistant_message="Found 5 files."))
+        agent = self.session.agents["ag1"]
+        self.assertEqual((agent.state, agent.activity, agent.elapsed(100)), ("ok", "Found 5 files.", 6))
+        self.board.expire(18.9, lambda pid: True)
+        self.assertIn("ag1", self.session.agents)
+        self.board.expire(19, lambda pid: True)
+        self.assertNotIn("ag1", self.session.agents)
+
+    def test_internal_agent_stops_are_ignored(self):
+        self.board.apply(event("SubagentStop", 9, agent_id="internal", agent_type=""))
+        self.assertNotIn("internal", self.session.agents)
+
+    def test_running_agents_keep_a_finished_session_visible(self):
+        self.board.apply(event("Stop", 10))
+        self.board.expire(30, lambda pid: True)
+        self.assertEqual(self.session.status, IDLE)
+        self.assertEqual(self.board.visible(), [self.session])
+
+    def test_permission_from_an_agent_names_it(self):
+        ask = self.board.add_ask(event("PermissionRequest", 6, tool_name="Bash", tool_input=BASH, agent_id="ag1", agent_type="Explore"))
+        self.assertEqual(ask.agent, "Map the theme files")
+        self.assertEqual(self.session.agents["ag1"].activity, "Waiting for permission")
+
+    def test_interrupt_fails_running_agents(self):
+        self.board.interrupted("s1", 7, 8)
+        self.assertEqual(self.session.agents["ag1"].state, "error")
+
+
 if __name__ == "__main__":
     unittest.main()

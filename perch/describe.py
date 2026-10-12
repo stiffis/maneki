@@ -26,6 +26,18 @@ def first_line(text, limit=80):
     return clip(lines[0].strip(), limit) if lines else ""
 
 
+def duration(seconds):
+    if seconds is None:
+        return ""
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    hours, rest = divmod(seconds, 3600)
+    return f"{hours}h {rest // 60}m"
+
+
 def file_name(path):
     return posixpath.basename((path or "").rstrip("/")) or (path or "")
 

@@ -12,9 +12,12 @@ DONE = "done"
 IDLE = "idle"
 
 SHOWN = (ASKING, ATTENTION, WORKING, DONE)
+BUSY = (ASKING, ATTENTION, WORKING)
 PRIORITY = {ASKING: 0, ATTENTION: 1, WORKING: 2, DONE: 3, IDLE: 4}
 ATTENTION_NOTIFICATIONS = {"elicitation_dialog", "elicitation_url_dialog", "agent_needs_input"}
 PASS_THROUGH_LABELS = {"AskUserQuestion": "Has a question for you", "ExitPlanMode": "Plan ready for review"}
+AGENT_TOOLS = ("Agent", "Task")
+DEFAULT_AGENT = "general-purpose"
 STEP_LIMIT = 12
 RECENT_LIMIT = 24
 STALE_SECONDS = 12 * 3600
@@ -25,6 +28,21 @@ class Step:
     key: str
     label: str
     state: str = "running"
+
+
+@dataclass
+class Agent:
+    id: str
+    kind: str
+    label: str
+    started: float
+    ended: float | None = None
+    steps: int = 0
+    activity: str = ""
+    state: str = "running"
+
+    def elapsed(self, now):
+        return (self.ended or now) - self.started
 
 
 @dataclass
@@ -40,8 +58,11 @@ class Session:
     seen: float = 0.0
     transcript: str = ""
     turn_ts: float = 0.0
+    turn_end: float | None = None
     steps: deque = field(default_factory=lambda: deque(maxlen=STEP_LIMIT))
     recent: deque = field(default_factory=lambda: deque(maxlen=RECENT_LIMIT))
+    launches: deque = field(default_factory=lambda: deque(maxlen=RECENT_LIMIT))
+    agents: dict = field(default_factory=dict)
 
     @property
     def name(self):
@@ -49,6 +70,16 @@ class Session:
 
     def step(self, key):
         return next((step for step in self.steps if step.key == key), None)
+
+    def running_agents(self):
+        return [agent for agent in self.agents.values() if agent.state == "running"]
+
+    def elapsed(self, now):
+        if self.status in BUSY:
+            return now - self.turn_ts
+        if self.turn_end is not None:
+            return self.turn_end - self.turn_ts
+        return None
 
 
 @dataclass
@@ -60,6 +91,7 @@ class Ask:
     suggestion: dict | None
     ts: float
     tool_use_id: str | None = None
+    agent: str = ""
 
 
 class Board:
@@ -72,14 +104,15 @@ class Board:
 
     def touch(self, event):
         session_id = event.get("session_id") or "unknown"
+        ts = event.get("ts") or time.time()
         session = self.sessions.get(session_id)
         if session is None:
-            session = self.sessions[session_id] = Session(session_id)
+            session = self.sessions[session_id] = Session(session_id, turn_ts=ts)
         session.cwd = event.get("cwd") or session.cwd
         session.title = event.get("session_title") or session.title
         session.pid = event.get("claude_pid") or session.pid
         session.transcript = event.get("transcript_path") or session.transcript
-        session.seen = max(session.seen, event.get("ts") or time.time())
+        session.seen = max(session.seen, ts)
         return session
 
     @staticmethod
@@ -110,38 +143,63 @@ class Board:
             self.set_status(session, WORKING, ts, describe.THINKING)
             session.message = ""
             session.turn_ts = ts
+            session.turn_end = None
             return [ask.id for ask in self.asks_of(session.id)]
         elif name == "PreToolUse":
-            self.tool_started(session, key, tool, data, ts)
+            self.tool_started(session, event, key, tool, data, ts)
         elif name in ("PostToolUse", "PostToolUseFailure", "PermissionDenied"):
-            return self.tool_finished(session, key, tool, data, ts, name == "PostToolUse")
+            return self.tool_finished(session, event, key, tool, data, ts, name == "PostToolUse")
+        elif name == "SubagentStart":
+            self.agent_started(session, event, ts)
+        elif name == "SubagentStop":
+            self.agent_stopped(session, event, ts)
         elif name == "PermissionRequest":
             self.set_status(session, ATTENTION, ts, PASS_THROUGH_LABELS.get(tool, "Waiting for permission"))
         elif name == "Notification":
             self.notified(session, event, ts)
         elif name == "Stop":
-            self.set_status(session, DONE, ts, "Done")
+            if self.set_status(session, DONE, ts, "Done"):
+                session.turn_end = ts
             session.message = describe.clip((event.get("last_assistant_message") or "").strip(), 400)
             return [ask.id for ask in self.asks_of(session.id)]
         elif name == "StopFailure":
-            self.set_status(session, ATTENTION, ts, "Stopped with an error")
+            if self.set_status(session, ATTENTION, ts, "Stopped with an error"):
+                session.turn_end = ts
             session.message = describe.clip((event.get("error") or "").strip(), 300)
         return []
 
-    def tool_started(self, session, key, tool, data, ts):
+    def link_asks(self, session, key, tool, data):
+        session.recent.append((key, tool, data))
+        for ask in self.asks_of(session.id):
+            if ask.tool_use_id is None and ask.tool == tool and ask.data == data:
+                ask.tool_use_id = key
+                break
+
+    def tool_started(self, session, event, key, tool, data, ts):
         label = describe.activity(tool, data)
         if key:
-            if session.step(key) is None:
-                session.steps.append(Step(key, label))
-            session.recent.append((key, tool, data))
-            for ask in self.asks_of(session.id):
-                if ask.tool_use_id is None and ask.tool == tool and ask.data == data:
-                    ask.tool_use_id = key
-                    break
+            self.link_asks(session, key, tool, data)
+        if event.get("agent_id"):
+            agent = self.agent(session, event, ts)
+            agent.steps += 1
+            agent.activity = label
+            return
+        if key and session.step(key) is None:
+            session.steps.append(Step(key, label))
+        if tool in AGENT_TOOLS:
+            kind = data.get("subagent_type") or DEFAULT_AGENT
+            session.launches.append((kind, describe.first_line(data.get("description"), 50)))
         if not self.asks_of(session.id):
             self.set_status(session, WORKING, ts, label)
 
-    def tool_finished(self, session, key, tool, data, ts, ok):
+    def tool_finished(self, session, event, key, tool, data, ts, ok):
+        resolved = [
+            ask.id
+            for ask in self.asks_of(session.id)
+            if (key and ask.tool_use_id == key) or (ask.tool == tool and ask.data == data)
+        ]
+        if event.get("agent_id"):
+            return resolved
         step = session.step(key) if key else None
         if step is None and key:
             step = Step(key, describe.activity(tool, data))
@@ -150,11 +208,32 @@ class Board:
             step.state = "ok" if ok else "error"
         if session.status == WORKING:
             self.set_status(session, WORKING, ts, describe.THINKING)
-        return [
-            ask.id
-            for ask in self.asks_of(session.id)
-            if (key and ask.tool_use_id == key) or (ask.tool == tool and ask.data == data)
-        ]
+        return resolved
+
+    def agent(self, session, event, ts):
+        agent_id = event.get("agent_id")
+        agent = session.agents.get(agent_id)
+        if agent is None:
+            kind = event.get("agent_type") or DEFAULT_AGENT
+            label = next((text for k, text in session.launches if k == kind and text), "")
+            if label:
+                session.launches.remove((kind, label))
+            agent = session.agents[agent_id] = Agent(agent_id, kind, label or kind, ts)
+        return agent
+
+    def agent_started(self, session, event, ts):
+        agent = self.agent(session, event, ts)
+        agent.state = "running"
+        agent.ended = None
+        agent.activity = agent.activity or "Starting"
+
+    def agent_stopped(self, session, event, ts):
+        agent = session.agents.get(event.get("agent_id"))
+        if agent is None:
+            return
+        agent.state = "ok"
+        agent.ended = ts
+        agent.activity = describe.first_line(event.get("last_assistant_message"), 80) or "Done"
 
     def notified(self, session, event, ts):
         kind = event.get("notification_type")
@@ -163,13 +242,14 @@ class Board:
             text = describe.first_line(event.get("message"), 80) or "Needs your input"
             self.set_status(session, ATTENTION, ts, text)
         elif kind == "idle_prompt" and session.status in (WORKING, ATTENTION) and not self.asks_of(session.id):
-            self.set_status(session, IDLE, ts, "Waiting for you")
+            if self.set_status(session, IDLE, ts, "Waiting for you"):
+                session.turn_end = ts
 
     def watched(self):
         return [
             session
             for session in self.sessions.values()
-            if session.transcript and (session.status in (WORKING, ASKING, ATTENTION) or self.asks_of(session.id))
+            if session.transcript and (session.status in BUSY or self.asks_of(session.id))
         ]
 
     def result_seen(self, session_id, tool_use_id):
@@ -182,29 +262,38 @@ class Board:
         for step in session.steps:
             if step.state == "running":
                 step.state = "error"
-        self.set_status(session, IDLE, max(now, session.status_ts), "Interrupted")
+        for agent in session.running_agents():
+            agent.state = "error"
+            agent.ended = now
+        if self.set_status(session, IDLE, max(now, session.status_ts), "Interrupted"):
+            session.turn_end = now
         return [ask.id for ask in self.asks_of(session_id)]
 
     def add_ask(self, event):
         session = self.touch(event)
         tool = event.get("tool_name") or ""
         data = event.get("tool_input") or {}
+        ts = event.get("ts") or time.time()
         taken = {ask.tool_use_id for ask in self.asks.values()}
         key = next(
             (k for k, t, d in reversed(session.recent) if t == tool and d == data and k not in taken),
             None,
         )
+        agent = self.agent(session, event, ts) if event.get("agent_id") else None
         ask = Ask(
             id=self.next_id,
             session_id=session.id,
             tool=tool,
             data=data,
             suggestion=describe.pick_suggestion(event.get("permission_suggestions")),
-            ts=event.get("ts") or time.time(),
+            ts=ts,
             tool_use_id=key,
+            agent=agent.label if agent else "",
         )
         self.next_id += 1
         self.asks[ask.id] = ask
+        if agent:
+            agent.activity = "Waiting for permission"
         self.set_status(session, ASKING, ask.ts, describe.activity(tool, data))
         return ask
 
@@ -235,13 +324,20 @@ class Board:
             if dead or now - session.seen > self.stale_seconds:
                 resolved += self.drop(session.id)
                 changed = True
-            elif session.status == DONE and now - session.status_ts >= self.done_seconds:
+                continue
+            if session.status == DONE and now - session.status_ts >= self.done_seconds:
                 session.status = IDLE
                 changed = True
+            for agent in list(session.agents.values()):
+                if agent.ended is not None and now - agent.ended >= self.done_seconds:
+                    del session.agents[agent.id]
+                    changed = True
         return changed, resolved
 
     def visible(self, everything=False):
-        shown = [s for s in self.sessions.values() if everything or s.status in SHOWN]
+        shown = [
+            s for s in self.sessions.values() if everything or s.status in SHOWN or s.running_agents()
+        ]
         return sorted(shown, key=lambda s: (PRIORITY[s.status], -s.seen))
 
     def names(self):
@@ -251,7 +347,8 @@ class Board:
             for session in self.sessions.values()
         }
 
-    def snapshot(self):
+    def snapshot(self, now=None):
+        now = now or time.time()
         names = self.names()
         return {
             "sessions": [
@@ -262,8 +359,20 @@ class Board:
                     "status": s.status,
                     "activity": s.activity,
                     "message": s.message,
+                    "elapsed": s.elapsed(now),
                     "pid": s.pid,
                     "steps": [{"label": step.label, "state": step.state} for step in s.steps],
+                    "agents": [
+                        {
+                            "kind": a.kind,
+                            "label": a.label,
+                            "state": a.state,
+                            "steps": a.steps,
+                            "activity": a.activity,
+                            "elapsed": a.elapsed(now),
+                        }
+                        for a in s.agents.values()
+                    ],
                 }
                 for s in self.visible(everything=True)
             ],
@@ -271,6 +380,7 @@ class Board:
                 {
                     "id": ask.id,
                     "session": names.get(ask.session_id, ask.session_id),
+                    "agent": ask.agent,
                     "tool": ask.tool,
                     "detail": describe.ask_detail(ask.tool, ask.data),
                     "always": describe.always_label(ask.suggestion),
