@@ -1,0 +1,14 @@
+:root {
+    --bg: #fdf6e3;
+    --surface: #f4f0d9;
+    --border: #bdc3af;
+    --text: #5c6a72;
+    --muted: #708089;
+    --working: #dfa000;
+    --asking: #f57d26;
+    --attention: #df69ba;
+    --done: #8da101;
+    --danger: #f85552;
+    --accent: #8da101;
+    --on-accent: #fdf6e3;
+}

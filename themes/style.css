@@ -1,0 +1,137 @@
+window.perch {
+    background: transparent;
+}
+
+.island {
+    background-color: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 6px 12px;
+    min-width: 280px;
+    font-size: 13px;
+}
+
+.session {
+    padding: 2px 0;
+}
+
+.dot {
+    font-size: 11px;
+}
+
+.dot.working {
+    color: var(--working);
+    animation: perch-pulse 1.4s ease-in-out infinite;
+}
+
+.dot.asking {
+    color: var(--asking);
+}
+
+.dot.attention {
+    color: var(--attention);
+    animation: perch-pulse 0.9s ease-in-out infinite;
+}
+
+.dot.done {
+    color: var(--done);
+}
+
+.dot.idle {
+    color: var(--muted);
+}
+
+@keyframes perch-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.25; }
+    100% { opacity: 1; }
+}
+
+.name {
+    font-weight: bold;
+}
+
+.activity {
+    color: var(--muted);
+}
+
+.details {
+    margin: 0 0 4px 19px;
+}
+
+.step {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.step.running {
+    color: var(--working);
+}
+
+.step.error {
+    color: var(--danger);
+}
+
+.message {
+    color: var(--text);
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.ask {
+    background-color: var(--surface);
+    border: 1px solid var(--asking);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 4px 0 2px 0;
+}
+
+.ask-title {
+    font-weight: bold;
+}
+
+.ask-detail {
+    font-family: monospace;
+    background-color: var(--bg);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.ask button {
+    background-image: none;
+    background-color: var(--surface);
+    box-shadow: none;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-height: 24px;
+    padding: 2px 10px;
+    color: var(--text);
+}
+
+.ask button:hover {
+    opacity: 0.85;
+}
+
+.ask button.allow {
+    background-color: var(--accent);
+    border-color: var(--accent);
+    color: var(--on-accent);
+    font-weight: bold;
+}
+
+.ask button.deny {
+    border-color: var(--danger);
+    color: var(--danger);
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 11px;
+}
+
+tooltip {
+    background-color: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
