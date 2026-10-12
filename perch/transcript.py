@@ -1,9 +1,16 @@
 import json
 import os
+import stat
 from datetime import datetime
 
 INTERRUPTED = "[Request interrupted by user"
 MARKERS = (b'"tool_result"', INTERRUPTED.encode())
+ROOT = os.path.join(os.path.expanduser("~"), ".claude", "projects")
+
+
+def allowed(path, root=ROOT):
+    real = os.path.realpath(path or "")
+    return real.startswith(os.path.realpath(root) + os.sep) and real.endswith(".jsonl")
 
 
 def end_offset(path):
@@ -43,9 +50,15 @@ def signals(entry):
     return found
 
 
-def scan(path, offset):
+def scan(path, offset, root=ROOT):
+    if not allowed(path, root):
+        return [], offset
     try:
-        with open(path, "rb") as transcript:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+        if not stat.S_ISREG(os.fstat(descriptor).st_mode):
+            os.close(descriptor)
+            return [], offset
+        with os.fdopen(descriptor, "rb") as transcript:
             size = transcript.seek(0, os.SEEK_END)
             if size < offset:
                 offset = 0
