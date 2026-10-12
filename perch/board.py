@@ -20,6 +20,7 @@ DEFAULT_AGENT = "general-purpose"
 STEP_LIMIT = 12
 RECENT_LIMIT = 24
 STALE_SECONDS = 12 * 3600
+IDLE_WITHOUT_PID_SECONDS = 30 * 60
 
 
 @dataclass
@@ -332,7 +333,8 @@ class Board:
         resolved = []
         for session in list(self.sessions.values()):
             dead = session.pid is not None and not alive(session.pid)
-            if dead or now - session.seen > self.stale_seconds:
+            forgotten = session.pid is None and session.status == IDLE and now - session.seen > IDLE_WITHOUT_PID_SECONDS
+            if dead or forgotten or now - session.seen > self.stale_seconds:
                 resolved += self.drop(session.id)
                 changed = True
                 continue

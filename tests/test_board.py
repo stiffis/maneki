@@ -225,5 +225,23 @@ class MultiAgentTest(unittest.TestCase):
         self.assertEqual(board.sessions["s1"].agents["child"].label, "Scan")
 
 
+class NoPidTest(unittest.TestCase):
+    def test_idle_sessions_without_a_pid_are_forgotten_after_half_an_hour(self):
+        board = Board()
+        board.apply(event("UserPromptSubmit", 1, agent="codex"))
+        board.apply(event("Stop", 10, agent="codex"))
+        board.expire(100, lambda pid: True)
+        board.expire(10 + 30 * 60 - 1, lambda pid: True)
+        self.assertIn("s1", board.sessions)
+        board.expire(10 + 30 * 60 + 1, lambda pid: True)
+        self.assertNotIn("s1", board.sessions)
+
+    def test_sessions_with_a_live_pid_stay(self):
+        board = Board()
+        board.apply(event("Stop", 10, pid=7))
+        board.expire(10 + 3 * 3600, lambda pid: True)
+        self.assertIn("s1", board.sessions)
+
+
 if __name__ == "__main__":
     unittest.main()
