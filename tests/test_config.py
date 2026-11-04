@@ -26,6 +26,23 @@ class ParseTest(unittest.TestCase):
             self.assertEqual(len(problems), 1, text)
 
 
+class RotationTest(unittest.TestCase):
+    def test_the_last_mascot_wraps_to_the_first(self):
+        names = tuple(config.SPRITES)
+        self.assertEqual(config.next_mascot(names[0]), names[1])
+        self.assertEqual(config.next_mascot(names[-1]), names[0])
+
+    def test_no_mascot_starts_from_the_first(self):
+        self.assertEqual(config.next_mascot("none"), tuple(config.SPRITES)[0])
+
+    def test_a_missing_line_is_added_on_top(self):
+        self.assertEqual(config.with_mascot("mascot_scale = 3\n", "cat"), 'mascot = "cat"\nmascot_scale = 3\n')
+
+    def test_the_scale_line_is_not_mistaken_for_the_mascot(self):
+        text = 'mascot_scale = 3\nmascot = "cat"\n'
+        self.assertEqual(config.with_mascot(text, "osaka"), 'mascot_scale = 3\nmascot = "osaka"\n')
+
+
 class LoadTest(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.TemporaryDirectory()
@@ -43,6 +60,23 @@ class LoadTest(unittest.TestCase):
         self.file.write_text("mascot = ")
         with mock.patch("sys.stderr"):
             self.assertEqual(config.load(), config.DEFAULTS)
+
+    def test_rotating_goes_through_every_mascot_and_back(self):
+        seen = [config.rotate_mascot() for _ in config.SPRITES]
+        self.assertEqual(sorted(seen), sorted(config.SPRITES))
+        self.assertEqual(seen[-1], config.DEFAULTS["mascot"])
+        self.assertEqual(config.load()["mascot"], seen[-1])
+
+    def test_rotating_keeps_the_rest_of_the_file(self):
+        self.file.parent.mkdir()
+        self.file.write_text('# mine\nmascot_scale = 3\nmascot = "osaka"\n')
+        name = config.rotate_mascot()
+        self.assertEqual(self.file.read_text(), f'# mine\nmascot_scale = 3\nmascot = "{name}"\n')
+        self.assertEqual(config.load()["mascot_scale"], 3)
+
+    def test_rotating_leaves_no_temporary_files(self):
+        config.rotate_mascot()
+        self.assertEqual([path.name for path in self.file.parent.iterdir()], ["config.toml"])
 
     def test_the_file_is_read(self):
         self.file.parent.mkdir()
