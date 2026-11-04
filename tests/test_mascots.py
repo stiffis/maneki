@@ -53,6 +53,16 @@ class SpriteTest(unittest.TestCase):
                 self.assertTrue(pose.bubble == "" or pose.bubble in known, pose.bubble)
         self.assertIn("sata andagi!", mascots.bubbles("osaka"))
 
+    def test_haruhi_points_at_a_request_at_once(self):
+        pose = mascots.pose("haruhi", ASKING, 0, 0.0, False, False)
+        self.assertEqual(pose.bubble, "Hey, Kyon!")
+        self.assertIn(mascots.HARUHI_POINT, pose.parts)
+
+    def test_haruhi_says_her_own_lines(self):
+        lines = mascots.bubbles("haruhi")
+        for line in ("any aliens?", "great job, guys!", "against the rules!"):
+            self.assertIn(line, lines)
+
     def test_osaka_notices_a_request_late(self):
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 0.5, False, False).bubble, "…")
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 2.0, False, False).bubble, "huh?!")

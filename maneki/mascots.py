@@ -219,6 +219,105 @@ def osaka_frame(state, frame, age, rest, blink):
     return Pose((eyes, OSAKA_MOUTHS["flat"]), bubble="where'd it go?")
 
 
+HARUHI_BASE = (
+    ".......oooooo.......",
+    ".....ooHHLLHHoo.....",
+    "....oHHLLLLLLHHo....",
+    "...oYYYYYYYYYYYYo...",
+    "..oYHHHHHLLHHHHHYo..",
+    "..oHHHHHHHHHHHHHHo..",
+    ".oHHHHHfHHHHfHHHHHo.",
+    ".oHHHffffHHffffHHHo.",
+    ".oHHfffffHffffffHHo.",
+    ".oHHffffffffffffHHo.",
+    ".oHHffffffffffffHHo.",
+    ".oHHffffffffffffHHo.",
+    ".oHHfqffffFfffqfHHo.",
+    "oHHHHffffffffffHHHHo",
+    "oDHHHoffffffffoHHHDo",
+    "oDoHHHooffffooHHHoDo",
+    ".o.oDHcFFFFFFcHDo.o.",
+    ".occcBRBbFFbBRBccco.",
+    "occccBRBbbbbBRBcccco",
+    "occccBRBBrrBBRBcccco",
+    "oCcccCBBrrrrBBCcccCo",
+)
+HARUHI_RIBBON = ["YY  ", "YAY ", "AYY ", " AY ", " YA ", " Y  "]
+HARUHI_RIBBONS = patch(3, 0, HARUHI_RIBBON) + patch(3, 16, mirrored(HARUHI_RIBBON))
+HARUHI_RIBBON_UP = ["YYY ", "AYY ", " AY ", " YA ", " Y  ", "    "]
+HARUHI_RIBBONS_UP = patch(3, 0, HARUHI_RIBBON_UP) + patch(3, 16, mirrored(HARUHI_RIBBON_UP))
+
+
+def haruhi_eyes(rows, right=None):
+    return patch(8, 5, rows) + patch(8, 11, right or rows)
+
+
+HARUHI_LASHES = ((7, 5, "o"), (7, 14, "o"))
+HARUHI_EYES = {
+    "open": HARUHI_LASHES + haruhi_eyes(["oooo", "hTTW", "IPPI", "WIIW"]),
+    "right": HARUHI_LASHES + haruhi_eyes(["oooo", "WhTT", "WIPP", "WWII"]),
+    "bored": haruhi_eyes(["    ", "oooo", "IPPI", "WIIW"]),
+    "angry": haruhi_eyes(["o   ", "ooo ", "IPPo", "WIIW"], ["   o", " ooo", "oPPI", "WIIW"]),
+    "closed": haruhi_eyes(["    ", "    ", "o  o", " oo "]),
+    "happy": haruhi_eyes(["    ", " oo ", "o  o", "    "]),
+}
+HARUHI_MOUTHS = {
+    "smile": patch(13, 8, ["m  m", " mm "]),
+    "flat": patch(14, 8, [" mm "]),
+    "pout": patch(13, 8, [" mm ", "m  m"]),
+    "open": patch(13, 8, ["mmmm", "mnnm", " mm "]),
+}
+HARUHI_CROSSED = patch(18, 0, [
+    "occccRRcccccccRRccco",
+    "oCcccccRRccRRccccCCo",
+    "oCCccccccRRccccCCCCo",
+])
+HARUHI_ARM = [
+    "   oooo ",
+    "  offffo",
+    " oBffoo ",
+    "oBBffo  ",
+    "ovvoo   ",
+    "cvvo    ",
+    "ccco    ",
+    "cco     ",
+]
+HARUHI_POINT = patch(10, 18, HARUHI_ARM)
+HARUHI_JAB = patch(9, 18, HARUHI_ARM + ["cco     "])
+HARUHI_FIST = patch(7, 17, [
+    " ooo ",
+    "offfo",
+    "offfo",
+    "oBBBo",
+    "occco",
+    " occo",
+    " occo",
+    " occo",
+    " occo",
+    " occo",
+    " cco ",
+])
+HARUHI_SEARCHING = ("any aliens?", "any espers?", "so boring…")
+HARUHI_ORDERS = ("30 seconds!", "faster, Kyon!")
+HARUHI_PRAISE = ("Awesome!", "great job, guys!")
+
+
+def haruhi_frame(state, frame, age, rest, blink):
+    closed = HARUHI_EYES["closed"]
+    ribbons = HARUHI_RIBBONS if rest or frame % 2 == 0 else HARUHI_RIBBONS_UP
+    if state == IDLE:
+        return Pose((HARUHI_RIBBONS, closed if blink else HARUHI_EYES["bored"], HARUHI_MOUTHS["flat"], HARUHI_CROSSED), bubble=HARUHI_SEARCHING[frame // 4 % 3])
+    if state == WORKING:
+        look = HARUHI_EYES["open"] if rest or frame % 4 < 2 else HARUHI_EYES["right"]
+        return Pose((ribbons, closed if blink else look, HARUHI_MOUTHS["smile"]), bubble=HARUHI_ORDERS[frame // 4 % 2])
+    if state == ASKING:
+        arm = HARUHI_JAB if not rest and frame % 2 else HARUHI_POINT
+        return Pose((HARUHI_RIBBONS, closed if blink else HARUHI_EYES["right"], HARUHI_MOUTHS["open"], arm), bubble="Hey, Kyon!")
+    if state == DONE:
+        return Pose((ribbons, HARUHI_EYES["happy"], HARUHI_MOUTHS["open"], HARUHI_FIST), dy=0 if rest else (0, 2, 3, 2)[frame % 4], bubble=HARUHI_PRAISE[frame // 6 % 2])
+    return Pose((HARUHI_RIBBONS, closed if blink else HARUHI_EYES["angry"], HARUHI_MOUTHS["pout"], HARUHI_CROSSED), bubble="against the rules!")
+
+
 SPRITES = {
     "cat": Sprite(
         "cat",
@@ -243,6 +342,19 @@ SPRITES = {
         },
         base=OSAKA_BASE,
         frame=osaka_frame,
+    ),
+    "haruhi": Sprite(
+        "haruhi",
+        left=0,
+        width=26,
+        palette={
+            "o": "#2b1a14", "H": "#5e3b2a", "D": "#3d2419", "L": "#84583f", "Y": "#f7a81c", "A": "#c97a10",
+            "f": "#fde2cb", "F": "#e6bb9f", "W": "#ffffff", "I": "#e3a43a", "T": "#a0642a", "P": "#2e1a0e",
+            "h": "#ffffff", "m": "#7f2f2c", "n": "#d65f5f", "q": "#f7b3a4", "B": "#5e9cc8", "b": "#9ccbe4",
+            "R": "#7a2f3c", "c": "#f6f4f2", "C": "#cfcdd8", "r": "#c0283a", "v": "#e4552f",
+        },
+        base=HARUHI_BASE,
+        frame=haruhi_frame,
     ),
 }
 
