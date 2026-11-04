@@ -322,10 +322,13 @@ class Island:
         self.load_css()
         settings = config.load()
         if settings != self.settings:
+            switched = settings["mascot"] != self.settings["mascot"]
             self.settings = settings
             if self.mascot:
                 self.mascot.sleep()
             self.mascot = self.make_mascot()
+            if switched and self.mascot:
+                self.mascot.feel(mascots.DONE)
             self.queue_render()
         return GLib.SOURCE_REMOVE
 
