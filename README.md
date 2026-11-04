@@ -150,14 +150,15 @@ Pick it in `~/.config/maneki/config.toml`; the island reloads the file when it
 changes:
 
 ```toml
-mascot = "osaka"   # "cat" (the default), "osaka" or "none"
+mascot = "osaka"   # "cat" (the default), "osaka", "haruhi" or "none"
 mascot_scale = 2   # 1 to 4 screen pixels per sprite pixel (default 2)
 ```
 
-The cat is an orange tabby. Osaka is fan art of Ayumu "Osaka" Kasuga from
-Azumanga Daioh: the pixel drawing and its animations are ours and under the
-GPL, but the character belongs to Kiyohiko Azuma and is not covered by it.
-Pick the cat for a mascot that is free all the way down. The sprites live as
+The cat is an orange tabby. Osaka and Haruhi are fan art: Ayumu "Osaka" Kasuga
+from Azumanga Daioh belongs to Kiyohiko Azuma, and Haruhi Suzumiya from The
+Melancholy of Haruhi Suzumiya belongs to Nagaru Tanigawa and Noizi Ito. The
+pixel drawings and animations are ours and under the GPL, but the characters
+are not covered by it. Pick the cat for a mascot that is free all the way down. The sprites live as
 text grids in `maneki/mascots.py`.
 
 ## Theming
@@ -205,5 +206,5 @@ maneki demo    # two fake sessions and a permission request
 maneki is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
-version. See [LICENSE](LICENSE). The agent logos and the Osaka character are
-not the project's own; see Icons and Mascot above.
+version. See [LICENSE](LICENSE). The agent logos and the Osaka and Haruhi
+characters are not the project's own; see Icons and Mascot above.
