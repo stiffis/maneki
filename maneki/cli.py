@@ -28,6 +28,7 @@ def parser():
     sub.add_parser("hook", help="entry point for Claude Code hooks (JSON on stdin)")
     for name, text in COMMANDS.items():
         sub.add_parser(name, help=text)
+    sub.add_parser("mascot", help="switch to the next mascot")
     sub.add_parser("demo", help="send fake sessions to the island")
     setup = sub.add_parser("setup", help="install hooks, keybinds, autostart and themes (dry run by default)")
     setup.add_argument("--apply", action="store_true", help="make the changes instead of only showing them")
@@ -60,6 +61,15 @@ def main(argv):
         from .daemon import main as daemon
 
         return daemon()
+    if args.command == "mascot":
+        from .config import rotate_mascot
+
+        try:
+            print(rotate_mascot())
+        except (OSError, UnicodeDecodeError) as error:
+            print(f"maneki: could not change the mascot: {error}", file=sys.stderr)
+            return 1
+        return 0
     if args.command == "demo":
         from .demo import main as demo
 
