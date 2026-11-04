@@ -163,6 +163,10 @@ pixel drawings and animations are ours and under the GPL, but the characters
 are not covered by it. Pick the cat for a mascot that is free all the way down. The sprites live as
 text grids in `maneki/mascots.py`.
 
+To add mascots of your own, write them in `maneki/mascots_local.py`, which git
+ignores, and export them as a `LOCAL_SPRITES` dictionary. The island loads the
+file when it exists and joins them to the rotation.
+
 ## Theming
 
 The island loads `~/.config/maneki/colors.css`, then the base `themes/style.css`
