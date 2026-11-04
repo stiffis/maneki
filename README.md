@@ -125,6 +125,7 @@ against the file's hash, and skipped when it is already there.
 | `Super+Alt+A` | `maneki always`   | allow it and keep the rule Claude suggested   |
 | `Super+Alt+I` | `maneki toggle`   | show idle sessions and recent steps           |
 | `Super+Alt+D` | `maneki dnd`      | do not disturb: only permission requests show |
+| `Super+Alt+P` | `maneki mascot`   | switch to the next mascot                     |
 |               | `maneki terminal` | leave the request to the agent's own prompt   |
 
 While a window is truly fullscreen on the focused monitor (not just
@@ -146,8 +147,9 @@ now and then. It never takes clicks: only the island does. In do not disturb,
 the mascot still pops up alone for a moment to show that something finished or
 was interrupted.
 
-Pick it in `~/.config/maneki/config.toml`; the island reloads the file when it
-changes:
+Press `Super+Alt+P` to switch to the next one: it pops up for a moment so you
+can see who you picked. Or pick it in `~/.config/maneki/config.toml`; the island
+reloads the file when it changes:
 
 ```toml
 mascot = "osaka"   # "cat" (the default), "osaka", "haruhi" or "none"
