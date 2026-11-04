@@ -1,1 +1,3 @@
 __pycache__/
+maneki/mascots_local.py
+tests/test_mascots_local.py

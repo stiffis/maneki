@@ -1,5 +1,8 @@
 import itertools
+import sys
+import types
 import unittest
+from unittest import mock
 
 from maneki import mascots
 from maneki.mascots import ASKING, DONE, IDLE, INTERRUPTED, SPRITES, STATES, WORKING
@@ -66,6 +69,21 @@ class SpriteTest(unittest.TestCase):
     def test_osaka_notices_a_request_late(self):
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 0.5, False, False).bubble, "…")
         self.assertEqual(mascots.pose("osaka", ASKING, 1, 2.0, False, False).bubble, "huh?!")
+
+
+class LocalSpritesTest(unittest.TestCase):
+    def test_a_missing_file_adds_nothing(self):
+        with mock.patch.dict(sys.modules, {"maneki.mascots_local": None}):
+            self.assertEqual(mascots.local_sprites(), {})
+
+    def test_a_broken_file_is_ignored(self):
+        with mock.patch.dict(sys.modules, {"maneki.mascots_local": types.SimpleNamespace()}), mock.patch("sys.stderr"):
+            self.assertEqual(mascots.local_sprites(), {})
+
+    def test_the_file_adds_its_sprites(self):
+        local = types.SimpleNamespace(LOCAL_SPRITES={"mine": SPRITES["cat"]})
+        with mock.patch.dict(sys.modules, {"maneki.mascots_local": local}):
+            self.assertEqual(mascots.local_sprites(), {"mine": SPRITES["cat"]})
 
 
 class MoodTest(unittest.TestCase):

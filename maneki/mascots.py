@@ -1,3 +1,4 @@
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Callable
@@ -357,6 +358,22 @@ SPRITES = {
         frame=haruhi_frame,
     ),
 }
+
+
+def local_sprites():
+    try:
+        from .mascots_local import LOCAL_SPRITES
+    except ModuleNotFoundError as error:
+        if error.name != f"{__package__}.mascots_local":
+            print(f"maneki: ignoring local mascots: {error}", file=sys.stderr)
+        return {}
+    except Exception as error:
+        print(f"maneki: ignoring local mascots: {error}", file=sys.stderr)
+        return {}
+    return LOCAL_SPRITES
+
+
+SPRITES.update(local_sprites())
 
 
 def rgb(color):
